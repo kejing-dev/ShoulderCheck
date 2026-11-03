@@ -1,0 +1,6 @@
+Noto Sans SC (variable), subset for Shoulder Check. A Modified Version under the SIL OFL 1.1.
+source: NotoSansSC-VF.ttf  Version 2.004-H2;hotconv 1.0.118;makeotfexe 2.5.65603
+axes kept: [('wght', 100.0, 100.0, 900.0)]
+glyphs: 414  characters: 361
+characters: °±·×÷–—‘’“”…‰′″№←↑→↓↔↕≥■□▲△◆○◌●✓　、。〈〉《》「」『』【】一七万三上下不与丢两个中主之九习了二于五交亮从代会伸位低住体作你侥侧信值做停儿先光入全八公六关内再冲况出分列判到制前动区十千升单危厘去反发取变可右后向启哪四回国在均坐型处外多大失头好子字学它安定实宽寸对就尺左差已布常幅平并幸序应度开式弯录形往态总情慢成所手才打托执找把按挡排推提握摆摇摩改放效教数文断新方旁无日时是显暂替最有服朝未本机权杆束来查校检椅模次正步每毫汇汽没法消清港灯点状率现用电百的目盲看眼确示离种秒程稳空突站第等算米系约级线练组结给统继绩续置考能自舒英范荐荷行表要规角言计认记设识语课调走起超路跳踪身车转辆边过返还这远连追退通遍道那部都里重量键镜门间阈际陆降限除险随难零需静非靠面音页顺题风香驶驾骤高！（），：；？｜～
+not in the source font (left to the system fallback): U+270B U+2726 U+27F2 U+29B8

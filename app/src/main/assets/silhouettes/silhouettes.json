@@ -1,0 +1,668 @@
+{
+ "_doc": "Orthographic renders of the calibrated models (front -> -Z). bboxPx = [x0, y0, x1, y1) of non-transparent pixels; widthM/heightM = real size that bbox represents; pxPerM = scale; groundPx = image position of the vehicle's bottom-centre (calibrated origin). Camera azimuth from behind (+Z) toward the vehicle's right (+X); elevation looks slightly down. Not mirror-flipped. For a mirror use front/fl/fr (followers face you): a follower in the lane to your LEFT shows its front + right flank = 'fr'; one in the lane / bike lane to your RIGHT = 'fl'. rear/lr/rr = as the design package asked (背面/左后/右后).",
+ "heightPx": 256,
+ "azimuthDeg3q": 30.0,
+ "elevationDeg": 4.0,
+ "images": {
+  "sedan_rear.png": {
+   "role": "sedan",
+   "view": "rear",
+   "azimuthDeg": 0.0,
+   "sizePx": [
+    329,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    325,
+    252
+   ],
+   "pxPerM": 146.148,
+   "widthM": 2.196,
+   "heightM": 1.697,
+   "groundPx": [
+    164.5,
+    239.0
+   ]
+  },
+  "sedan_lr.png": {
+   "role": "sedan",
+   "view": "lr",
+   "azimuthDeg": -30.0,
+   "sizePx": [
+    507,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    503,
+    252
+   ],
+   "pxPerM": 144.891,
+   "widthM": 3.444,
+   "heightM": 1.712,
+   "groundPx": [
+    251.7,
+    237.4
+   ]
+  },
+  "sedan_rr.png": {
+   "role": "sedan",
+   "view": "rr",
+   "azimuthDeg": 30.0,
+   "sizePx": [
+    507,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    503,
+    252
+   ],
+   "pxPerM": 144.517,
+   "widthM": 3.453,
+   "heightM": 1.716,
+   "groundPx": [
+    255.4,
+    236.8
+   ]
+  },
+  "sedan_front.png": {
+   "role": "sedan",
+   "view": "front",
+   "azimuthDeg": 180.0,
+   "sizePx": [
+    317,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    313,
+    252
+   ],
+   "pxPerM": 140.489,
+   "widthM": 2.199,
+   "heightM": 1.765,
+   "groundPx": [
+    158.5,
+    237.9
+   ]
+  },
+  "sedan_fl.png": {
+   "role": "sedan",
+   "view": "fl",
+   "azimuthDeg": 210.0,
+   "sizePx": [
+    492,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    488,
+    252
+   ],
+   "pxPerM": 140.288,
+   "widthM": 3.45,
+   "heightM": 1.768,
+   "groundPx": [
+    244.2,
+    236.0
+   ]
+  },
+  "sedan_fr.png": {
+   "role": "sedan",
+   "view": "fr",
+   "azimuthDeg": 150.0,
+   "sizePx": [
+    491,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    487,
+    253
+   ],
+   "pxPerM": 140.099,
+   "widthM": 3.448,
+   "heightM": 1.777,
+   "groundPx": [
+    247.2,
+    235.2
+   ]
+  },
+  "suv_rear.png": {
+   "role": "suv",
+   "view": "rear",
+   "azimuthDeg": 0.0,
+   "sizePx": [
+    309,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    305,
+    252
+   ],
+   "pxPerM": 138.956,
+   "widthM": 2.166,
+   "heightM": 1.785,
+   "groundPx": [
+    154.5,
+    238.9
+   ]
+  },
+  "suv_lr.png": {
+   "role": "suv",
+   "view": "lr",
+   "azimuthDeg": -30.0,
+   "sizePx": [
+    495,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    491,
+    253
+   ],
+   "pxPerM": 137.616,
+   "widthM": 3.539,
+   "heightM": 1.809,
+   "groundPx": [
+    250.0,
+    237.0
+   ]
+  },
+  "suv_rr.png": {
+   "role": "suv",
+   "view": "rr",
+   "azimuthDeg": 30.0,
+   "sizePx": [
+    495,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    491,
+    252
+   ],
+   "pxPerM": 137.63,
+   "widthM": 3.538,
+   "heightM": 1.802,
+   "groundPx": [
+    246.0,
+    237.5
+   ]
+  },
+  "suv_front.png": {
+   "role": "suv",
+   "view": "front",
+   "azimuthDeg": 180.0,
+   "sizePx": [
+    287,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    283,
+    252
+   ],
+   "pxPerM": 128.733,
+   "widthM": 2.167,
+   "heightM": 1.926,
+   "groundPx": [
+    143.5,
+    238.8
+   ]
+  },
+  "suv_fl.png": {
+   "role": "suv",
+   "view": "fl",
+   "azimuthDeg": 210.0,
+   "sizePx": [
+    466,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    462,
+    252
+   ],
+   "pxPerM": 129.34,
+   "widthM": 3.541,
+   "heightM": 1.917,
+   "groundPx": [
+    234.4,
+    238.0
+   ]
+  },
+  "suv_fr.png": {
+   "role": "suv",
+   "view": "fr",
+   "azimuthDeg": 150.0,
+   "sizePx": [
+    464,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    460,
+    252
+   ],
+   "pxPerM": 128.766,
+   "widthM": 3.541,
+   "heightM": 1.926,
+   "groundPx": [
+    229.7,
+    237.1
+   ]
+  },
+  "ebike_rear.png": {
+   "role": "ebike",
+   "view": "rear",
+   "azimuthDeg": 0.0,
+   "sizePx": [
+    139,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    135,
+    252
+   ],
+   "pxPerM": 143.896,
+   "widthM": 0.91,
+   "heightM": 1.723,
+   "groundPx": [
+    69.5,
+    246.7
+   ]
+  },
+  "ebike_lr.png": {
+   "role": "ebike",
+   "view": "lr",
+   "azimuthDeg": -30.0,
+   "sizePx": [
+    181,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    177,
+    252
+   ],
+   "pxPerM": 144.299,
+   "widthM": 1.199,
+   "heightM": 1.719,
+   "groundPx": [
+    85.8,
+    247.4
+   ]
+  },
+  "ebike_rr.png": {
+   "role": "ebike",
+   "view": "rr",
+   "azimuthDeg": 30.0,
+   "sizePx": [
+    180,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    176,
+    253
+   ],
+   "pxPerM": 144.245,
+   "widthM": 1.192,
+   "heightM": 1.726,
+   "groundPx": [
+    94.8,
+    246.8
+   ]
+  },
+  "ebike_front.png": {
+   "role": "ebike",
+   "view": "front",
+   "azimuthDeg": 180.0,
+   "sizePx": [
+    139,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    135,
+    252
+   ],
+   "pxPerM": 143.645,
+   "widthM": 0.912,
+   "heightM": 1.726,
+   "groundPx": [
+    69.5,
+    247.7
+   ]
+  },
+  "ebike_fl.png": {
+   "role": "ebike",
+   "view": "fl",
+   "azimuthDeg": 210.0,
+   "sizePx": [
+    180,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    176,
+    253
+   ],
+   "pxPerM": 144.212,
+   "widthM": 1.193,
+   "heightM": 1.727,
+   "groundPx": [
+    85.2,
+    248.0
+   ]
+  },
+  "ebike_fr.png": {
+   "role": "ebike",
+   "view": "fr",
+   "azimuthDeg": 150.0,
+   "sizePx": [
+    181,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    177,
+    253
+   ],
+   "pxPerM": 144.206,
+   "widthM": 1.2,
+   "heightM": 1.727,
+   "groundPx": [
+    95.2,
+    248.0
+   ]
+  },
+  "bike_rear.png": {
+   "role": "bike",
+   "view": "rear",
+   "azimuthDeg": 0.0,
+   "sizePx": [
+    106,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    102,
+    252
+   ],
+   "pxPerM": 139.468,
+   "widthM": 0.703,
+   "heightM": 1.778,
+   "groundPx": [
+    53.0,
+    247.3
+   ]
+  },
+  "bike_lr.png": {
+   "role": "bike",
+   "view": "lr",
+   "azimuthDeg": -30.0,
+   "sizePx": [
+    135,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    131,
+    252
+   ],
+   "pxPerM": 139.869,
+   "widthM": 0.908,
+   "heightM": 1.773,
+   "groundPx": [
+    67.8,
+    248.1
+   ]
+  },
+  "bike_rr.png": {
+   "role": "bike",
+   "view": "rr",
+   "azimuthDeg": 30.0,
+   "sizePx": [
+    135,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    131,
+    252
+   ],
+   "pxPerM": 139.852,
+   "widthM": 0.908,
+   "heightM": 1.773,
+   "groundPx": [
+    67.2,
+    248.1
+   ]
+  },
+  "bike_front.png": {
+   "role": "bike",
+   "view": "front",
+   "azimuthDeg": 180.0,
+   "sizePx": [
+    105,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    101,
+    252
+   ],
+   "pxPerM": 137.855,
+   "widthM": 0.704,
+   "heightM": 1.799,
+   "groundPx": [
+    52.5,
+    246.5
+   ]
+  },
+  "bike_fl.png": {
+   "role": "bike",
+   "view": "fl",
+   "azimuthDeg": 210.0,
+   "sizePx": [
+    133,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    129,
+    252
+   ],
+   "pxPerM": 138.383,
+   "widthM": 0.903,
+   "heightM": 1.792,
+   "groundPx": [
+    66.7,
+    247.3
+   ]
+  },
+  "bike_fr.png": {
+   "role": "bike",
+   "view": "fr",
+   "azimuthDeg": 150.0,
+   "sizePx": [
+    133,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    129,
+    253
+   ],
+   "pxPerM": 138.348,
+   "widthM": 0.904,
+   "heightM": 1.8,
+   "groundPx": [
+    66.2,
+    246.8
+   ]
+  },
+  "moto_rear.png": {
+   "role": "moto",
+   "view": "rear",
+   "azimuthDeg": 0.0,
+   "sizePx": [
+    134,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    130,
+    252
+   ],
+   "pxPerM": 134.358,
+   "widthM": 0.938,
+   "heightM": 1.846,
+   "groundPx": [
+    67.0,
+    245.7
+   ]
+  },
+  "moto_lr.png": {
+   "role": "moto",
+   "view": "lr",
+   "azimuthDeg": -30.0,
+   "sizePx": [
+    159,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    155,
+    253
+   ],
+   "pxPerM": 134.788,
+   "widthM": 1.12,
+   "heightM": 1.847,
+   "groundPx": [
+    81.8,
+    246.1
+   ]
+  },
+  "moto_rr.png": {
+   "role": "moto",
+   "view": "rr",
+   "azimuthDeg": 30.0,
+   "sizePx": [
+    158,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    153,
+    252
+   ],
+   "pxPerM": 134.685,
+   "widthM": 1.106,
+   "heightM": 1.841,
+   "groundPx": [
+    76.4,
+    246.4
+   ]
+  },
+  "moto_front.png": {
+   "role": "moto",
+   "view": "front",
+   "azimuthDeg": 180.0,
+   "sizePx": [
+    133,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    129,
+    252
+   ],
+   "pxPerM": 133.242,
+   "widthM": 0.938,
+   "heightM": 1.861,
+   "groundPx": [
+    66.5,
+    245.9
+   ]
+  },
+  "moto_fl.png": {
+   "role": "moto",
+   "view": "fl",
+   "azimuthDeg": 210.0,
+   "sizePx": [
+    157,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    153,
+    252
+   ],
+   "pxPerM": 133.85,
+   "widthM": 1.113,
+   "heightM": 1.853,
+   "groundPx": [
+    81.1,
+    246.9
+   ]
+  },
+  "moto_fr.png": {
+   "role": "moto",
+   "view": "fr",
+   "azimuthDeg": 150.0,
+   "sizePx": [
+    157,
+    256
+   ],
+   "bboxPx": [
+    4,
+    4,
+    153,
+    252
+   ],
+   "pxPerM": 133.755,
+   "widthM": 1.114,
+   "heightM": 1.854,
+   "groundPx": [
+    76.2,
+    246.7
+   ]
+  }
+ }
+}

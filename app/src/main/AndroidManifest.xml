@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Design container.permissions: eye tracking only (runtime permission, asked on S01; refused or unsupported ->
+         mirror looks judged by head direction, S17). Head, controller and hand tracking need no manifest permission in
+         SDK 6.1.9 (the tracking AAR declares none; Full Space only). No camera, microphone, location, spatial sensing,
+         network. -->
+    <uses-permission android:name="com.picovr.permission.EYE_TRACKING" />
+
+    <application
+        android:name=".platform.SpatialApplication"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ShoulderCheck"
+        tools:targetApi="31">
+
+        <activity
+            android:name=".platform.LaunchActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ShoulderCheck">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- DefaultStage: Full ("3": only virtual content), the car and the street open around you (design
+                 container STAGE_FULL; enum 0 Automatic / 1 Mixed / 2 Progressive / 3 Full) -->
+            <meta-data
+                android:name="pico.spatial.stage.id"
+                android:value="ShoulderCheckStage" />
+            <meta-data
+                android:name="pico.spatial.stage.style"
+                android:value="3" />
+            <meta-data
+                android:name="pico.spatial.stage.immersion"
+                android:value="100" />
+            <meta-data
+                android:name="pico.spatial.stage.immersion_min"
+                android:value="100" />
+            <meta-data
+                android:name="pico.spatial.stage.immersion_max"
+                android:value="100" />
+        </activity>
+
+        <!-- Transparent helper for the eye-tracking permission dialog (S01, S17 "去开启"). -->
+        <activity
+            android:name=".platform.EyePermissionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ShoulderCheck" />
+    </application>
+
+</manifest>

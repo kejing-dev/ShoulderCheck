@@ -1,0 +1,296 @@
+{
+ "_doc": "Per role (use scale; scaleBalanced is only an alternative that spreads the size error over L/W/H): apply on a parent calibration node TRS = translate(translation) * rotateY(yawDeg) * uniform scale(scale), i.e. p' = t + Ry(yaw)(s p). Ry(+yaw) is right-handed about +Y (seen from above counter-clockwise; +X -> -Z at +90). Result: bottom-centre at the origin, front / handlebars toward -Z, +Y up, length = design length. bbox in model units (scene space of the GLB, node transforms included). sizeError = (calibrated - design)/design.",
+ "units": "model units for bbox, metres after calibration",
+ "generatedBy": "tools/process_models.py",
+ "sedan": {
+  "forwardAxis": "+Z",
+  "yawDeg": 180.0,
+  "scale": 4.698652794447865,
+  "translation": [
+   0.0022941940444063127,
+   -0.001075436278026092,
+   -0.001147132029894498
+  ],
+  "bboxMin": [
+   -0.23320011794567108,
+   0.0002288818359375,
+   -0.4897461533546448
+  ],
+  "bboxMax": [
+   0.2341766506433487,
+   0.346923828125,
+   0.4892578721046448
+  ],
+  "modelSize": {
+   "L": 0.9790040254592896,
+   "W": 0.4673767685890198,
+   "H": 0.3466949462890625
+  },
+  "sizeAfterM": {
+   "L": 4.6,
+   "W": 2.196041159790811,
+   "H": 1.6289991782020559,
+   "Wbody": 1.8565617746939078
+  },
+  "designM": {
+   "L": 4.6,
+   "W": 1.8,
+   "H": 1.45
+  },
+  "sizeError": {
+   "L": 0.0,
+   "W": 0.2200228665504505,
+   "H": 0.12344770910486615,
+   "Wbody": 0.0314232081632821
+  },
+  "note": "W includes the door mirrors; Wbody = widest point below 55 % height (no mirrors)",
+  "scaleBalanced": 4.473458712358733,
+  "sizeErrorIfBalanced": {
+   "L": -0.04792737236410214,
+   "H": 0.06960381241899974,
+   "W": -0.018010195999336422
+  },
+  "source": "sc_car_silver.glb",
+  "file": "sedan.glb",
+  "fileMB": 0.601,
+  "trianglesBefore": 1910339,
+  "trianglesAfter": 11493,
+  "textureSizes": [
+   [
+    512,
+    512
+   ]
+  ]
+ },
+ "suv": {
+  "forwardAxis": "-X",
+  "yawDeg": -90.0,
+  "scale": 4.802893445976969,
+  "translation": [
+   -0.0033345999468625325,
+   -0.0010260087317455683,
+   0.00043971802789095806
+  ],
+  "bboxMin": [
+   -0.4893799424171448,
+   0.000213623046875,
+   -0.22587589919567108
+  ],
+  "bboxMax": [
+   0.4891968369483948,
+   0.3587646484375,
+   0.2244873195886612
+  ],
+  "modelSize": {
+   "L": 0.9785767793655396,
+   "W": 0.4503632187843323,
+   "H": 0.358551025390625
+  },
+  "sizeAfterM": {
+   "L": 4.7,
+   "W": 2.1630465518083613,
+   "H": 1.7220823698969547,
+   "Wbody": 1.849307738908163
+  },
+  "designM": {
+   "L": 4.7,
+   "W": 1.9,
+   "H": 1.7
+  },
+  "sizeError": {
+   "L": 0.0,
+   "W": 0.1384455535833481,
+   "H": 0.01298962935114987,
+   "Wbody": -0.026680137416756317
+  },
+  "note": "W includes the door mirrors; Wbody = widest point below 55 % height (no mirrors)",
+  "scaleBalanced": 4.825578926827079,
+  "sizeErrorIfBalanced": {
+   "L": 0.004723294635885004,
+   "H": 0.017774277833671175,
+   "W": -0.022082860930816572
+  },
+  "source": "sc_suv_red.glb",
+  "file": "suv.glb",
+  "fileMB": 0.622,
+  "trianglesBefore": 1951546,
+  "trianglesAfter": 11479,
+  "textureSizes": [
+   [
+    512,
+    512
+   ]
+  ]
+ },
+ "ebike": {
+  "forwardAxis": "+X",
+  "yawDeg": 90.0,
+  "scale": 1.735755249422181,
+  "translation": [
+   -0.00023842143847307068,
+   -0.001748044532193969,
+   0.00034431180179578176
+  ],
+  "bboxMin": [
+   -0.4895020127296448,
+   0.001007080078125,
+   -0.260833740234375
+  ],
+  "bboxMax": [
+   0.4898987412452698,
+   0.977783203125,
+   0.2611084580421448
+  ],
+  "modelSize": {
+   "L": 0.9794007539749146,
+   "W": 0.5219421982765198,
+   "H": 0.976776123046875
+  },
+  "sizeAfterM": {
+   "L": 1.7,
+   "W": 0.9059639105534221,
+   "H": 1.6954442830888596
+  },
+  "designM": {
+   "L": 1.7,
+   "H": 1.7
+  },
+  "sizeError": {
+   "L": 0.0,
+   "H": -0.0026798334771413633
+  },
+  "scaleBalanced": 1.7380857019007845,
+  "sizeErrorIfBalanced": {
+   "L": 0.0013426158321452723,
+   "H": -0.0013408156318501655
+  },
+  "source": "sc_ebike_delivery.glb",
+  "file": "ebike.glb",
+  "fileMB": 0.561,
+  "trianglesBefore": 1868200,
+  "trianglesAfter": 11499,
+  "textureSizes": [
+   [
+    512,
+    512
+   ]
+  ]
+ },
+ "bike": {
+  "forwardAxis": "+X",
+  "yawDeg": 90.0,
+  "scale": 1.7955909627371243,
+  "translation": [
+   -0.00016441801884799643,
+   -0.0008767533997739865,
+   -1.00677000252174e-20
+  ],
+  "bboxMin": [
+   -0.4873047471046448,
+   0.00048828125,
+   -0.1954803615808487
+  ],
+  "bboxMax": [
+   0.4873047471046448,
+   0.978118896484375,
+   0.19566349685192108
+  ],
+  "modelSize": {
+   "L": 0.9746094942092896,
+   "W": 0.3911438584327698,
+   "H": 0.977630615234375
+  },
+  "sizeAfterM": {
+   "L": 1.75,
+   "W": 0.7023343773320105,
+   "H": 1.7554246976099785
+  },
+  "designM": {
+   "L": 1.75,
+   "H": 1.75
+  },
+  "sizeError": {
+   "L": 0.0,
+   "H": 0.0030998272057020265
+  },
+  "scaleBalanced": 1.7928144053500121,
+  "sizeErrorIfBalanced": {
+   "L": -0.0015463195375408237,
+   "H": 0.001548714344789965
+  },
+  "source": "sc_bike_navy.glb",
+  "file": "bike.glb",
+  "fileMB": 0.574,
+  "trianglesBefore": 1946136,
+  "trianglesAfter": 11481,
+  "textureSizes": [
+   [
+    512,
+    512
+   ]
+  ]
+ },
+ "moto": {
+  "forwardAxis": "-X",
+  "yawDeg": -90.0,
+  "scale": 2.0509479873719854,
+  "translation": [
+   -0.0006572251985733888,
+   -0.004068347753270845,
+   0.0005633096889144246
+  ],
+  "bboxMin": [
+   -0.4878540635108948,
+   0.001983642578125,
+   -0.22802738845348358
+  ],
+  "bboxMax": [
+   0.4873047471046448,
+   0.885223388671875,
+   0.2273864895105362
+  ],
+  "modelSize": {
+   "L": 0.9751588106155396,
+   "W": 0.4554138779640198,
+   "H": 0.88323974609375
+  },
+  "sizeAfterM": {
+   "L": 1.9999999999999998,
+   "W": 0.9340301764315773,
+   "H": 1.81147877961792
+  },
+  "designM": {
+   "L": 2.0,
+   "H": 1.6
+  },
+  "sizeError": {
+   "L": -1.1102230246251565e-16,
+   "H": 0.1321742372611999
+  },
+  "scaleBalanced": 1.927516092342415,
+  "sizeErrorIfBalanced": {
+   "L": -0.06018284997452905,
+   "H": 0.06403676499508237
+  },
+  "source": "sc_moto_blue.glb",
+  "file": "moto.glb",
+  "fileMB": 0.678,
+  "trianglesBefore": 1899347,
+  "trianglesAfter": 11498,
+  "textureSizes": [
+   [
+    512,
+    512
+   ]
+  ]
+ },
+ "blanking": [
+  "sedan front logo: 1393 texels -> rgb(158, 167, 179)",
+  "sedan front plate: 2388 texels -> rgb(34, 36, 38)",
+  "sedan rear logo: 252 texels -> rgb(135, 141, 152)",
+  "sedan rear plate: 1210 texels -> rgb(153, 160, 170)",
+  "suv front logo: 828 texels -> rgb(120, 25, 41)",
+  "suv rear badge: 78 texels -> rgb(119, 30, 46)",
+  "suv rear plate: 798 texels -> rgb(118, 13, 29)"
+ ]
+}
