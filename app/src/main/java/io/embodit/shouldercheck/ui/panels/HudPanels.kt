@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pico.spatial.ui.design.Icon
 import com.pico.spatial.ui.design.PicoTheme
@@ -38,6 +37,7 @@ import io.embodit.shouldercheck.domain.Situation
 import io.embodit.shouldercheck.domain.Step
 import io.embodit.shouldercheck.domain.StepState
 import io.embodit.shouldercheck.ui.components.Glass
+import io.embodit.shouldercheck.ui.components.fits
 import io.embodit.shouldercheck.ui.components.ScType
 import io.embodit.shouldercheck.ui.components.Segments
 import io.embodit.shouldercheck.ui.components.StatusLabel
@@ -57,7 +57,7 @@ import io.embodit.shouldercheck.ui.theme.ScColors
 fun P2Panel(state: UiState, onEvent: (Ev) -> Unit) {
     val hud = state.hud
     Glass(760.dp, 176.dp, corner = 28.dp, padding = 14.dp, spacing = 10.dp) {
-        Row(modifier = Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             if (hud.setIndex != null && hud.setLevel != null) {
                 Box(modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(PicoTheme.colorScheme.fillTertiary).padding(horizontal = 10.dp, vertical = 6.dp)) {
                     Text(rs(R.string.set_prefix, hud.setIndex, hud.setLevel), style = PicoTheme.typography.labelLarge, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1)
@@ -68,7 +68,7 @@ fun P2Panel(state: UiState, onEvent: (Ev) -> Unit) {
             WordButton("pause", rs(R.string.pause), { onEvent(Ev.Pause) }, iconRes = R.drawable.ic_pause, minWidth = 84.dp)
             WordButton("mute", rs(if (state.muted) R.string.unmute else R.string.mute), { onEvent(Ev.ToggleMute) }, iconRes = if (state.muted) R.drawable.ic_volume_off else R.drawable.ic_volume, minWidth = 84.dp)
         }
-        Row(modifier = Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             if (state.base == Base.S11) {
                 Segments("speed", listOf("0.5×", "1×"), if (hud.replaySpeed < 0.75f) 0 else 1, { i -> onEvent(Ev.ReplaySpeed(if (i == 0) 0.5 else 1.0)) }, 200.dp)
                 Text(rs(R.string.sec_fmt, fmt1(hud.replayT)), style = ScType.chip, color = PicoTheme.colorScheme.labelPrimary)
@@ -97,7 +97,7 @@ private fun Row1(state: UiState) {
         msg is HudMessage.MirrorGone -> StatusLabel(R.drawable.ic_info, rs(R.string.msg_mirror_gone, msg.seconds), ScColors.Stale, ScType.task)
         state.base == Base.S11 -> Line(rs(R.string.replay_title))
         state.base == Base.S04 -> Line(hud.demoLine?.let { rs(Words.demo(it)) } ?: rs(R.string.demo_go))
-        hud.rearNoteDeg != null -> Text(rs(R.string.rear_note, hud.rearNoteDeg), style = PicoTheme.typography.bodyMedium, color = PicoTheme.colorScheme.labelPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        hud.rearNoteDeg != null -> Text(rs(R.string.rear_note, hud.rearNoteDeg), style = PicoTheme.typography.bodyMedium, color = PicoTheme.colorScheme.labelPrimary, maxLines = 2, onTextLayout = fits("Hud#100"))
         hud.situation == Situation.MIRRORS && hud.blindLeft != null -> Line(rs(R.string.blind, fmt1(hud.blindLeft)) + " · " + rs(R.string.blind_right, fmt1(hud.blindRight ?: 0.0)))
         hud.situation != null -> Line(rs(Words.task(hud.situation)))
     }
@@ -105,7 +105,7 @@ private fun Row1(state: UiState) {
 
 @Composable
 private fun Line(text: String) {
-    Text(text, style = ScType.task, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text(text, style = ScType.task, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("Hud#108"))
 }
 
 /** One step block: icon (state colour) + name; the look-back block adds the live "64° / 60°". */
@@ -133,7 +133,7 @@ private fun StepBlock(chip: StepChip, state: UiState, modifier: Modifier) {
         // long English labels ("Right mirror") wrap onto two lines instead of being cut (S20 check)
         val twoLines = !shoulder && label.length > 9
         Column(verticalArrangement = Arrangement.Center) {
-            Text(label, style = if (twoLines) ScType.chip.copy(fontSize = androidx.compose.ui.unit.TextUnit(16f, androidx.compose.ui.unit.TextUnitType.Sp), lineHeight = androidx.compose.ui.unit.TextUnit(18f, androidx.compose.ui.unit.TextUnitType.Sp)) else ScType.chip, color = PicoTheme.colorScheme.labelPrimary, maxLines = if (twoLines) 2 else 1, overflow = TextOverflow.Ellipsis)
+            Text(label, style = if (twoLines) ScType.chip.copy(fontSize = androidx.compose.ui.unit.TextUnit(16f, androidx.compose.ui.unit.TextUnitType.Sp), lineHeight = androidx.compose.ui.unit.TextUnit(18f, androidx.compose.ui.unit.TextUnitType.Sp)) else ScType.chip, color = PicoTheme.colorScheme.labelPrimary, maxLines = if (twoLines) 2 else 1, onTextLayout = fits("Hud#136"))
             if (shoulder) {
                 val ang = if (chip.step == Step.SHOULDER_LEFT) state.angLeft else state.angRight
                 Text("${ang.deg}° / ${ang.threshold ?: 0}°", style = PicoTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum, lnum"), color = PicoTheme.colorScheme.labelPrimary, maxLines = 1)

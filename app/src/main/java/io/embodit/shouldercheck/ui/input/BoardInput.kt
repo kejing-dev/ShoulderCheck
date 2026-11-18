@@ -108,6 +108,11 @@ data class BoardInputConfig(
     /** How far up the parent chain to look for an entity the resolver knows (GLB meshes hang below the collider). */
     val maxResolveDepth: Int = 10,
     val logTag: String = "BoardInput",
+    /**
+     * Which hit entities this layer listens to (null = any). Shoulder Check: only the door, so the SpatialView's tap /
+     * drag detectors never see presses meant for its attachment panels.
+     */
+    val accept: ((Entity) -> Boolean)? = null,
 )
 
 /**
@@ -201,6 +206,7 @@ fun <T : Any> Modifier.boardInput(
     fun pxToM(px: Float): Float = with(converter) { converter.dpToLength(px.toDp(), LengthUnit.Meters) }
     fun toMeters(o: Offset3D) = Offset3M(pxToM(o.x), -pxToM(o.y), pxToM(o.z))
     val tag = config.logTag
+    fun target(): TargetEntity = config.accept?.let { a -> TargetEntity.any { e -> a(e) } } ?: TargetEntity.any()
     val guard = androidx.compose.runtime.remember { TapGuard() }
     val hover = androidx.compose.runtime.remember { HoverState() }
     fun log(msg: String) { if (BoardInputLog.enabled) BoardInputLog.write(tag, msg) }
@@ -208,7 +214,7 @@ fun <T : Any> Modifier.boardInput(
     this
         // 1. raw pointer events: logging only (source, pressed, hit entity), never consumed
         .pointerInput(Unit) {
-            detectSpatialPointerEvent(context, TargetEntity.any()) { infos ->
+            detectSpatialPointerEvent(context, target()) { infos ->
                 // hover: not pressed, not a down / up -> highlight what the pointer is over
                 infos.lastOrNull { !it.pressed && !it.isDownEvent() && !it.isUpEvent() }?.let { h ->
                     val (hit, _) = resolveUp(h.targetedEntity, currentResolver, config.maxResolveDepth)
@@ -229,7 +235,7 @@ fun <T : Any> Modifier.boardInput(
         }
         // 2. system taps
         .pointerInput(Unit) {
-            detectSpatialTapGesture(context = context, targetedToEntity = TargetEntity.any()) { tap ->
+            detectSpatialTapGesture(context = context, targetedToEntity = target()) { tap ->
                 val src = InputSource.of(tap.interactionKind)
                 val (hit, path) = resolveUp(tap.targetEntity, currentResolver, config.maxResolveDepth)
                 log("TAP src=${src.label} kind=${tap.interactionKind} hit=$hit path=$path pos=(${"%.0f".format(tap.position.x)}, ${"%.0f".format(tap.position.y)}, ${"%.0f".format(tap.position.z)})")
@@ -248,7 +254,7 @@ fun <T : Any> Modifier.boardInput(
             val total = DragTotal()
             detectSpatialDragGesture(
                 context = context,
-                targetedToEntity = TargetEntity.any(),
+                targetedToEntity = target(),
                 onDragStart = { _, v ->
                     total.reset()
                     val (hit, path) = resolveUp(v.targetEntity, currentResolver, config.maxResolveDepth)

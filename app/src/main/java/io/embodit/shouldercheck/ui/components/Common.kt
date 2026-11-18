@@ -24,9 +24,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -147,7 +147,7 @@ internal fun WordButton(
             Icon(painter = painterResource(iconRes), contentDescription = null, modifier = Modifier.size(20.dp), tint = content)
             Spacer(modifier = Modifier.width(8.dp))
         }
-        Text(text = text, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis, style = ScType.button)
+        Text(text = text, color = content, maxLines = 1, onTextLayout = fits("Common#150"), style = ScType.button)
     }
 }
 
@@ -165,7 +165,7 @@ internal fun LinkButton(name: String, text: String, onClick: () -> Unit, modifie
 internal fun TitleRow(title: String, modifier: Modifier = Modifier, leading: (@Composable () -> Unit)? = null, trailing: @Composable () -> Unit = {}) {
     Row(modifier = modifier.fillMaxWidth().heightIn(min = MinTouch), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         if (leading != null) leading()
-        Text(text = title, style = PicoTheme.typography.headlineSmall, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Text(text = title, style = PicoTheme.typography.headlineSmall, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("Common#168"), modifier = Modifier.weight(1f))
         trailing()
     }
 }
@@ -178,7 +178,7 @@ internal fun StatusLabel(iconRes: Int, text: String, color: Color, style: TextSt
             Canvas(Modifier.size(iconSize + 4.dp)) { drawCircle(ScColors.IconDisc) }
             Icon(painter = painterResource(iconRes), contentDescription = null, modifier = Modifier.size(iconSize), tint = color)
         }
-        Text(text, style = style, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text, style = style, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("Common#181"))
     }
 }
 
@@ -212,7 +212,7 @@ internal fun Segments(name: String, items: List<String>, selected: Int, onSelect
 @Composable
 internal fun SettingRow(label: String, modifier: Modifier = Modifier, control: @Composable () -> Unit) {
     Row(modifier = modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = PicoTheme.typography.bodyLarge, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(end = 8.dp))
+        Text(label, style = PicoTheme.typography.bodyLarge, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("Common#215"), modifier = Modifier.weight(1f).padding(end = 8.dp))
         control()
     }
 }
@@ -220,10 +220,16 @@ internal fun SettingRow(label: String, modifier: Modifier = Modifier, control: @
 @Composable
 internal fun Dim(text: String, modifier: Modifier = Modifier, maxLines: Int = 2) {
     // Medium weight: regular-weight small text measured 3.9–4.4 : 1 on the glass in the HD shot (anti-aliasing)
-    Text(text, style = PicoTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), color = PicoTheme.colorScheme.labelPrimary, maxLines = maxLines, overflow = TextOverflow.Ellipsis, modifier = modifier)
+    Text(text, style = PicoTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), color = PicoTheme.colorScheme.labelPrimary, maxLines = maxLines, onTextLayout = fits("Common#223"), modifier = modifier)
 }
 
 @Composable
 internal fun Disabled(enabled: Boolean, content: @Composable () -> Unit) {
     Box(Modifier.alpha(if (enabled) 1f else 0.45f)) { content() }
 }
+
+/**
+ * D13 overflow log (no ellipsis): attach to every fixed-line Text; a clipped layout logs `OVERFLOW <id>` (tag
+ * ShoulderCheck) so the long-language scan finds it instead of an ellipsis hiding it.
+ */
+fun fits(id: String): (TextLayoutResult) -> Unit = { r -> if (r.hasVisualOverflow) io.embodit.shouldercheck.platform.ScLog.w("OVERFLOW $id") }

@@ -66,8 +66,8 @@
     <string name="task_lane_right">Mirrors, look back, signal, then move right</string>
     <string name="task_pull_out">Mirrors, look back, signal, then pull out</string>
     <string name="task_right_turn">Mirror, look back for bikes, then turn</string>
-    <string name="task_door_driver">Far hand on the handle, look back, then push</string>
-    <string name="task_door_rear">Far hand, turn right round, then push</string>
+    <string name="task_door_driver">Mirror, look back, then tap the door with your far hand</string>
+    <string name="task_door_rear">Turn right round, then tap the door with your far hand</string>
     <string name="task_mirrors">Look at all three mirrors, set the side ones</string>
     <string name="task_blind_spot">It left your mirror: look back and find it</string>
     <string name="demo_inner">First the rear-view mirror</string>
@@ -77,10 +77,10 @@
     <string name="demo_shoulder_right">Look back over your right shoulder</string>
     <string name="demo_signal_left">Left stick left: left signal</string>
     <string name="demo_signal_right">Left stick right: right signal</string>
-    <string name="demo_far_hand">Reach across with the far hand (grip)</string>
+    <string name="demo_far_hand">Point at the door with your far hand</string>
     <string name="demo_confirm">Set the mirror with the stick, A to confirm</string>
     <string name="demo_see">When it leaves the mirror, look back</string>
-    <string name="demo_go">Then press A to go (door: push 3 cm, then 10 cm)</string>
+    <string name="demo_go">Then press A to go (door: tap it once)</string>
     <string name="msg_turn_more_left">Turn %1$d° further left</string>
     <string name="msg_turn_more_right">Turn %1$d° further right</string>
     <string name="msg_relaxed">Two near misses: threshold now %1$d°</string>
@@ -191,7 +191,7 @@
     <string name="vol_low">Low</string>
     <string name="vol_mid">Mid</string>
     <string name="vol_high">High</string>
-    <string name="recentre">Recentre</string>
+    <string name="recentre">Bring it back in front</string>
     <string name="about">About</string>
     <string name="about_text">Shoulder Check 0.1.0 · offline · for practice, not a driving test or the law · fonts Noto Sans (OFL) · road users modelled with Tripo · sounds made for this app</string>
     <string name="exit">Quit app</string>
@@ -205,4 +205,13 @@
     <string name="deg">%1$d°</string>
     <string name="traffic_note_right">mainland China</string>
     <string name="traffic_note_left">HK · UK · Japan</string>
+    <string name="how_to_title">How to</string>
+    <string name="how_to_door">Door: point the controller ray and pull the trigger, or point a hand ray / look at it and pinch. One tap opens it.</string>
+    <string name="how_to_signal">Signal: push the left stick left or right once; push again to cancel.</string>
+    <string name="how_to_execute">Change lanes / pull out: press A on the right controller, or tap [Go] on the panel.</string>
+    <string name="how_to_close">Close the door to retry: press B, or tap [Close door] on the panel.</string>
+    <string name="how_to_look">Mirrors and shoulder checks: just move your eyes and head, no buttons.</string>
+    <string name="how_to_panel">Panel buttons: controller ray + trigger, or look at the button and pinch.</string>
+    <string name="how_to">How to</string>
+    <string name="how_to_back">Back to settings</string>
 </resources>

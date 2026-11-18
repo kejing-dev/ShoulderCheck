@@ -10,6 +10,7 @@ import io.embodit.shouldercheck.domain.BlindSpot
 import io.embodit.shouldercheck.domain.Box
 import io.embodit.shouldercheck.domain.Dir
 import io.embodit.shouldercheck.domain.DoorModel
+import io.embodit.shouldercheck.domain.DoorTargets
 import io.embodit.shouldercheck.domain.Excursion
 import io.embodit.shouldercheck.domain.FreeModeSet
 import io.embodit.shouldercheck.domain.GazeRay
@@ -48,6 +49,7 @@ import io.embodit.shouldercheck.domain.VolumeLevel
 import io.embodit.shouldercheck.platform.Audio
 import io.embodit.shouldercheck.platform.EyePermissionActivity
 import io.embodit.shouldercheck.platform.ScLog
+import io.embodit.shouldercheck.ui.input.BoardInputLog
 import io.embodit.shouldercheck.platform.Store
 import java.util.Locale
 import kotlin.math.abs
@@ -93,10 +95,14 @@ sealed interface Ev {
     data object ConfirmClear : Ev
     data object CancelConfirm : Ev
     data object ToggleAbout : Ev
+    data object ToggleHowTo : Ev
     data object Exit : Ev
     data object ConfirmExit : Ev
     data object Execute : Ev
     data object CloseDoor : Ev
+
+    /** One tap on the 3D door (D50): [source] = board-input InputSource label (controller / hand-ray / eye-hand …). */
+    data class TapDoor(val source: String) : Ev
     data object Confirm : Ev
     data object SkipDemo : Ev
     data object RetryLesson : Ev
@@ -183,6 +189,13 @@ object AppController {
     // ------------------------------------------------------------------ private state
     private var stateSinceMs = 0L
     private var nowMs = 0L
+
+    /** Last trigger press / pinch per hand (uptime of the frame), so a door tap knows which hand made it (D50). */
+    private val lastTriggerMs = HashMap<Hand, Long>()
+    private val lastPinchMs = HashMap<Hand, Long>()
+    private val triggerDown = HashMap<Hand, Boolean>()
+    private val pinchDown = HashMap<Hand, Boolean>()
+    private var lastDoorTapMs = -1L
     private var settingsFrom: Base = Base.S02
     private var recentring = false
     private var blockedSinceMs = -1L
@@ -341,7 +354,7 @@ object AppController {
             Ev.OpenScores -> go(Base.S12, "scores")
             Ev.OpenSettings -> {
                 if (base != Base.S15) settingsFrom = base
-                update { it.copy(showAbout = false) }
+                update { it.copy(showAbout = false, showHowTo = false) }
                 go(Base.S15, "settings")
             }
             Ev.Back ->
@@ -401,10 +414,12 @@ object AppController {
             }
             Ev.CancelConfirm -> update { it.copy(confirmClear = false, confirmExit = false) }
             Ev.ToggleAbout -> update { it.copy(showAbout = !it.showAbout) }
+            Ev.ToggleHowTo -> update { it.copy(showHowTo = !it.showHowTo) }
             Ev.Exit -> update { it.copy(confirmExit = true) }
             Ev.ConfirmExit -> quit()
             Ev.Execute -> run?.let { if (base == Base.S06) it.execPending = true }
             Ev.CloseDoor -> run?.let { closeDoor(it) }
+            is Ev.TapDoor -> tapDoor(e.source)
             Ev.Confirm -> run?.let { if (base == Base.S06) confirmMirror(it) }
             Ev.SkipDemo -> if (base == Base.S04) endDemo("skip")
             Ev.RetryLesson -> (course as? Course.LessonCourse)?.let { startLesson(it.lesson.n, skipDemo = true) }
@@ -842,6 +857,7 @@ object AppController {
 
     fun onFrame(input: FrameInput) {
         nowMs = input.nowMs
+        trackPresses(input)
         val head = applyHeadOverride(input.head)
         effHead = head
         val gaze = applyGazeOverride(input.gaze, head)
@@ -994,11 +1010,14 @@ object AppController {
         }
         if (presses.b > 0) closeDoor(r)
         handleSticks(r, input)
+        controllerRayTap(r, input)
         val (grab, push) = doorInput(r, input)
         val exec = r.execPending
         r.execPending = false
+        val tap = r.tapHand
+        r.tapHand = null
         val h = head ?: HeadIn(0.0, 0.0, Vec3.ZERO)
-        feedSample(r, JudgeSample(r.t, h.yaw, h.pitch, h.pos, if (r.judge.mode == JudgeMode.EYE) gaze else null, r.signal, grab, push, exec))
+        feedSample(r, JudgeSample(r.t, h.yaw, h.pitch, h.pos, if (r.judge.mode == JudgeMode.EYE) gaze else null, r.signal, grab, push, exec, tap))
     }
 
     /**
@@ -1060,6 +1079,71 @@ object AppController {
             } else if (!armed && abs(x) < 0.3f) {
                 r.stickArmed[hand] = true
             }
+        }
+    }
+
+    /** Press edges of triggers and pinches, kept per hand for [tapDoor]. */
+    private fun trackPresses(input: FrameInput) {
+        for (c in input.controllers) {
+            if (c.trigger && triggerDown[c.hand] != true) lastTriggerMs[c.hand] = nowMs
+            triggerDown[c.hand] = c.trigger
+        }
+        for (hand in Hand.values()) {
+            val down = input.pinches.any { it.first == hand && it.third > PINCH_HOLD }
+            if (down && pinchDown[hand] != true) lastPinchMs[hand] = nowMs
+            pinchDown[hand] = down
+        }
+    }
+
+    /**
+     * One tap on the door (D50; board-input listener, the controller-ray fallback and the debug `tapdoor` all come here):
+     * in a door question while checking (S06) the door swings open by itself; the hand whose trigger / pinch went down
+     * last counts for the far-hand step. A system tap and the fallback for the same press count once.
+     */
+    fun tapDoor(source: String): String {
+        val r = run ?: return log("DOOR tap src=$source ignored: no question")
+        if (r.scenario.situation.action != ActionKind.DOOR) return log("DOOR tap src=$source ignored: not a door scene")
+        val base = state.value.base
+        if (base != Base.S06) return log("DOOR tap src=$source ignored: base=${base.code}")
+        if (lastDoorTapMs >= 0 && nowMs - lastDoorTapMs < DoorTargets.DEDUPE_MS) return log("DOOR tap src=$source ignored: same press")
+        lastDoorTapMs = nowMs
+        val presses =
+            when {
+                source.startsWith("controller") -> lastTriggerMs
+                source == "hand-ray" || source == "eye-hand" || source == "direct-pinch" || source == "poke" -> lastPinchMs
+                else -> HashMap(lastPinchMs).apply { putAll(lastTriggerMs.filter { (h, t) -> (this[h] ?: -1L) < t }) }
+            }
+        val (hand, assumed) = DoorTargets.tapHand(presses, nowMs, r.scenario.cabin.farHand)
+        r.tapHand = hand
+        return log("DOOR tap src=$source hand=$hand${if (assumed) " (no press seen: far hand assumed)" else ""} far=${r.scenario.cabin.farHand}")
+    }
+
+    /** Debug `tapdoor hand=`: a trigger press (controller) or pinch by [hand] on this frame, as the trackers would report. */
+    fun dbgPress(hand: Hand, controller: Boolean) {
+        if (controller) lastTriggerMs[hand] = nowMs else lastPinchMs[hand] = nowMs
+    }
+
+    private fun log(msg: String): String {
+        ScLog.i(msg)
+        BoardInputLog.write("ShoulderCheck", msg)
+        return msg
+    }
+
+    /**
+     * Controller ray fallback (D50): in Full Space the system may not hand the controller's trigger to the SpatialView as
+     * a tap (no `kind=POINTER` seen in any factory headset log yet), so a trigger press whose aim ray (controller -Z)
+     * crosses the door's click box is a tap too. No ray is drawn (D41: the system draws its own).
+     */
+    private fun controllerRayTap(r: QuestionRun, input: FrameInput) {
+        if (r.scenario.situation.action != ActionKind.DOOR) return
+        val box = r.doorBox ?: return
+        for (c in input.controllers) {
+            val pos = c.pos ?: continue
+            val aim = c.aim ?: continue
+            if (lastTriggerMs[c.hand] != nowMs) continue
+            val d = DoorTargets.rayHit(pos, aim, box) ?: continue
+            ScLog.i(String.format(Locale.US, "DOOR ray hand=%s dist=%.2f", c.hand, d))
+            tapDoor("controller-ray")
         }
     }
 
@@ -1230,6 +1314,9 @@ object AppController {
         val g = r.judge.ghost(r.actorTime) ?: return null
         return g to (base == Base.S09)
     }
+
+    /** The 3D door takes taps (and shows the system hover) only while a door question is checking (S06). */
+    fun doorTappable(): Boolean = state.value.base == Base.S06 && run?.scenario?.situation?.action == ActionKind.DOOR
 
     fun doorAngle(): Double {
         val rp = replay

@@ -1,16 +1,20 @@
 package io.embodit.shouldercheck.app
 
+import io.embodit.shouldercheck.domain.ActionKind
 import io.embodit.shouldercheck.domain.Actor
 import io.embodit.shouldercheck.domain.ActorKind
 import io.embodit.shouldercheck.domain.ActorRole
 import io.embodit.shouldercheck.domain.Dir
+import io.embodit.shouldercheck.domain.DoorTargets
 import io.embodit.shouldercheck.domain.FreeModeSet
 import io.embodit.shouldercheck.domain.GazeRay
 import io.embodit.shouldercheck.domain.Hand
 import io.embodit.shouldercheck.domain.Key
+import io.embodit.shouldercheck.domain.Layout
 import io.embodit.shouldercheck.domain.Lesson
 import io.embodit.shouldercheck.domain.LiveStatus
 import io.embodit.shouldercheck.domain.MirrorAims
+import io.embodit.shouldercheck.domain.OccluderBox
 import io.embodit.shouldercheck.domain.Outcome
 import io.embodit.shouldercheck.domain.QuestionJudge
 import io.embodit.shouldercheck.domain.QuestionResult
@@ -26,7 +30,7 @@ import io.embodit.shouldercheck.domain.Vec3
 data class HeadIn(val yaw: Double, val pitch: Double, val pos: Vec3)
 
 /** One controller this frame, car frame. */
-data class CtrlIn(val hand: Hand, val pos: Vec3?, val grip: Boolean, val stickX: Float)
+data class CtrlIn(val hand: Hand, val pos: Vec3?, val grip: Boolean, val stickX: Float, val trigger: Boolean = false, val aim: Vec3? = null)
 
 /** Everything the ECS system read this frame, converted to the car frame of the current seat. */
 data class FrameInput(
@@ -75,6 +79,10 @@ class QuestionRun(val scenario: Scenario, val judge: QuestionJudge) {
     var grabHand: Hand? = null
     var grabPoint: Vec3? = null
     var push = 0.0
+
+    /** The hand of a door tap waiting for the next judge sample (D50), and the door's click box (car frame). */
+    var tapHand: Hand? = null
+    val doorBox: OccluderBox? = if (scenario.situation.action == ActionKind.DOOR) DoorTargets.box(Layout.cabin(scenario.seat, scenario.side)) else null
     var live: LiveStatus? = null
     var result: QuestionResult? = null
 

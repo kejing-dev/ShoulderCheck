@@ -38,6 +38,7 @@ data class GazeRay(val origin: Vec3, val dir: Vec3)
  * @param signal turn-signal state now.
  * @param grab the hand gripping inside the door handle's reach sphere (door scenes), or null.
  * @param push outward hand displacement since the grab, m (door scenes).
+ * @param doorTap the hand that tapped the door on this sample (controller ray, hand ray or eye-hand; door scenes), or null.
  * @param exec true on the sample where "execute" was pressed (A key / P2 button) — lane, pull-out, turn scenes.
  */
 data class JudgeSample(
@@ -50,6 +51,7 @@ data class JudgeSample(
     val grab: Hand? = null,
     val push: Double = 0.0,
     val exec: Boolean = false,
+    val doorTap: Hand? = null,
 )
 
 enum class StepState {
@@ -532,9 +534,11 @@ class QuestionJudge(
 
     private fun updateDoor(s: JudgeSample, dt: Double) {
         val d = door ?: return
+        if (phase == Phase.CHECKING && s.doorTap != null) d.tap(s.doorTap)
         d.update(dt, s.grab, s.push)
-        if (phase == Phase.CHECKING && s.grab != null) {
-            if (s.grab == cabin.farHand) mark(Step.FAR_HAND, s.t, byHead = false, lowConf = false)
+        val hand = s.grab ?: s.doorTap
+        if (phase == Phase.CHECKING && hand != null) {
+            if (hand == cabin.farHand) mark(Step.FAR_HAND, s.t, byHead = false, lowConf = false)
         }
     }
 

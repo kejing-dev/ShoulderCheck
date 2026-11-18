@@ -6,8 +6,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.graphics.Color
 import com.pico.spatial.core.container.SpatialViewContent
+import com.pico.spatial.core.ecs.CollisionComponent
 import com.pico.spatial.core.ecs.DirectionalLightComponent
 import com.pico.spatial.core.ecs.Entity
+import com.pico.spatial.core.ecs.HoverEffectComponent
+import com.pico.spatial.core.ecs.InteractableComponent
 import com.pico.spatial.core.ecs.ModelEntity
 import com.pico.spatial.core.ecs.SceneUpdateContext
 import com.pico.spatial.core.ecs.System
@@ -15,6 +18,8 @@ import com.pico.spatial.core.ecs.TransformComponent
 import com.pico.spatial.core.ecs.resource.BlendingMode
 import com.pico.spatial.core.ecs.resource.Material
 import com.pico.spatial.core.ecs.resource.MeshResource
+import com.pico.spatial.core.ecs.resource.PhysicsMaterialResource
+import com.pico.spatial.core.ecs.resource.ShapeResource
 import com.pico.spatial.core.ecs.resource.TextureResource
 import com.pico.spatial.core.ecs.resource.UnlitMaterial
 import com.pico.spatial.core.math.Color4
@@ -33,6 +38,7 @@ import io.embodit.shouldercheck.domain.Angles
 import io.embodit.shouldercheck.domain.Cabin
 import io.embodit.shouldercheck.domain.CabinLayout
 import io.embodit.shouldercheck.domain.Dir
+import io.embodit.shouldercheck.domain.DoorTargets
 import io.embodit.shouldercheck.domain.GazeRay
 import io.embodit.shouldercheck.domain.Hand
 import io.embodit.shouldercheck.domain.Layout
@@ -169,6 +175,10 @@ class CarScene(private val context: Context) {
     private var cabinGroups = HashMap<Seat, Entity>()
     private var cabinParts = HashMap<Seat, List<Pair<Entity, Part>>>()
     private var doorPivots = HashMap<Seat, Pair<Entity, Dir>>()
+
+    /** Tap holder of each seat's opening door (D50): Collision + Interactable + system HoverEffect, door meshes below. */
+    private val doorTaps = HashMap<Seat, Entity>()
+    private var doorTapOn = HashMap<Seat, Boolean>()
     private var cabinSide: TrafficSide? = null
     private var streetGroup: Entity? = null
     private var streetKey: String? = null
@@ -291,6 +301,10 @@ class CarScene(private val context: Context) {
         carRoot = null
         models?.close()
         models = null
+        doorTaps.clear()
+        doorTapOn.clear()
+        doorShapes.clear()
+        physicsMat = null
         shared.close()
         ScLog.i("SCENE detached (trackers stopped)")
     }
@@ -424,6 +438,8 @@ class CarScene(private val context: Context) {
         cabinGroups.clear()
         cabinParts.clear()
         doorPivots.clear()
+        doorTaps.clear()
+        doorTapOn.clear()
         faded.clear()
         for (seat in Seat.values()) {
             val layout = Layout.cabin(seat, side)
@@ -445,13 +461,27 @@ class CarScene(private val context: Context) {
             e.setLocal(position = p.centre, rotation = p.rotation, scale = p.size)
             out += e to p
         }
+        val tapBox = DoorTargets.box(layout)
         for (d in layout.doors) {
             val pivot = Entity().named(d.name)
             group.addChild(pivot)
             pivot.setLocal(position = d.hinge)
+            // the opening door hangs under a tap holder centred on its click box (the shape is centred on its entity),
+            // so the system hover lights the door's own meshes and a hit on any of them resolves up to the holder
+            val box = if (d.opens) tapBox else null
+            val centre = box?.let { (it.min + it.max) * 0.5 } ?: d.hinge
+            val parent =
+                if (box != null) {
+                    Entity().named(DoorTargets.holder(seat)).also {
+                        pivot.addChild(it)
+                        it.setLocal(position = centre - d.hinge)
+                        doorTaps[seat] = it
+                        doorShapes[seat] = shared.keep(ShapeResource.createBox((box.max - box.min).sdk()))
+                    }
+                } else pivot
             for (p in d.parts) {
-                val e = model(cube!!, mat(p.mat.name), p.name, pivot)
-                e.setLocal(position = p.centre - d.hinge, rotation = p.rotation, scale = p.size)
+                val e = model(cube!!, mat(p.mat.name), p.name, parent)
+                e.setLocal(position = p.centre - centre, rotation = p.rotation, scale = p.size)
                 // a closed door is part of the cabin for the D20 test
                 out += e to p
             }
@@ -727,7 +757,8 @@ class CarScene(private val context: Context) {
             for (s in listOf(ctrl.first, ctrl.second)) {
                 val pos = s.pose?.let { p -> carPose?.let { Placement.toCar(it, p.position) } }
                 if (s.pose != null) tracked = true
-                list += CtrlIn(s.hand, pos, s.gripPressed, s.stickX)
+                val aim = s.pose?.let { p -> carPose?.rotation?.conjugate()?.rotate(p.forward)?.normalized() }
+                list += CtrlIn(s.hand, pos, s.gripPressed, s.stickX, s.triggerPressed, aim)
                 if (s.hand == Hand.LEFT && abs(s.stickX - lastStick) > 0.2f) {
                     lastStick = s.stickX
                     if (!stickLogged || abs(s.stickX) > 0.7f) ScLog.i("N5 stick left x=${"%.2f".format(Locale.US, s.stickX)} (thumbstick injection works)")
@@ -755,6 +786,14 @@ class CarScene(private val context: Context) {
 
     private fun seat(): Seat = c.displayScenario().seat
 
+    private val doorShapes = HashMap<Seat, ShapeResource>()
+    private var physicsMat: PhysicsMaterialResource? = null
+
+    private fun physics(): PhysicsMaterialResource = physicsMat ?: shared.keep(PhysicsMaterialResource()).also { physicsMat = it }
+
+    /** The real door holder of [seat] (debug `tapdoor` replays a hit on its deepest mesh through the same listener). */
+    fun doorHolder(seat: Seat): Entity? = doorTaps[seat]
+
     private fun updateCabin() {
         val seat = seat()
         for ((s, g) in cabinGroups) {
@@ -764,6 +803,23 @@ class CarScene(private val context: Context) {
         doorPivots[seat]?.let { (pivot, side) ->
             val a = c.doorAngle()
             pivot.setLocal(rotation = Layout.rotY(side.sign * a))
+        }
+        // the door is clickable (and lit by the system hover) only while a door question is checking (S05 / S06)
+        for ((s, holder) in doorTaps) {
+            val on = s == seat && c.doorTappable()
+            if (doorTapOn[s] == on) continue
+            doorTapOn[s] = on
+            val shape = doorShapes[s] ?: continue
+            if (on) {
+                holder.components.set(CollisionComponent(collisionShape = listOf(shape), physicsMaterial = physics()))
+                holder.components.set(InteractableComponent())
+                holder.components.set(HoverEffectComponent())
+            } else {
+                holder.components.remove(HoverEffectComponent::class.java)
+                holder.components.remove(InteractableComponent::class.java)
+                holder.components.remove(CollisionComponent::class.java)
+            }
+            ScLog.i("DOOR tappable seat=$s on=$on")
         }
     }
 

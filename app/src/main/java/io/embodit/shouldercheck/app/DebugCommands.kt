@@ -30,6 +30,9 @@ object DebugCommands {
     /** The scene registers its dump (`panels`, `pose`, `scene`). */
     var sceneDump: ((String) -> String)? = null
 
+    /** The screen registers the door-tap replay (`tapdoor`): real door entities -> resolveUp -> the board-input listener. */
+    var doorReplay: ((String) -> String)? = null
+
     fun handle(name: String, args: Map<String, String>, positional: List<String>): String {
         // any command releases a previous `goto` hold unless it sets one again
         val before = c.dbgHold
@@ -88,6 +91,15 @@ object DebugCommands {
             "testtex" -> {
                 c.testTex = (args["testtex"] ?: pos.firstOrNull() ?: "1") != "0"
                 return "testtex=${c.testTex}"
+            }
+            "tapdoor" -> {
+                // `tapdoor [controller|hand-ray|eye-hand] [hand=L|R]`: hand = whose trigger / pinch went down first
+                val src = pos.firstOrNull() ?: args["tapdoor"]?.takeIf { it.isNotEmpty() } ?: "controller"
+                when (args["hand"]?.uppercase()) {
+                    "L" -> c.dbgPress(Hand.LEFT, src.startsWith("controller"))
+                    "R" -> c.dbgPress(Hand.RIGHT, src.startsWith("controller"))
+                }
+                return doorReplay?.invoke(src) ?: "no scene"
             }
             "tap" -> {
                 val target = pos.firstOrNull() ?: args["tap"] ?: return "tap <name>; known=${DebugProbe.names()}"

@@ -66,8 +66,8 @@
     <string name="task_lane_right">看镜、回头、打右灯，再向右变道</string>
     <string name="task_pull_out">看镜、回头、打灯，再起步汇入</string>
     <string name="task_right_turn">看镜、回头看非机动车，再转弯</string>
-    <string name="task_door_driver">远侧手握门把，回头看，再推门</string>
-    <string name="task_door_rear">远侧手握门把，连上身回头，再推门</string>
+    <string name="task_door_driver">看镜、回头，再用远侧手点一下门</string>
+    <string name="task_door_rear">连上身回头，再用远侧手点一下门</string>
     <string name="task_mirrors">看三面镜子，用摇杆调侧镜，按确认</string>
     <string name="task_blind_spot">车从镜子里消失了，回头找到它</string>
     <string name="demo_inner">先看车内镜</string>
@@ -77,10 +77,10 @@
     <string name="demo_shoulder_right">连上身回头，看右后方</string>
     <string name="demo_signal_left">左摇杆向左推：打左灯</string>
     <string name="demo_signal_right">左摇杆向右推：打右灯</string>
-    <string name="demo_far_hand">远侧手伸过去握住门把（握把键）</string>
+    <string name="demo_far_hand">用远侧的手指着门</string>
     <string name="demo_confirm">摇杆调侧镜，按 A 确认</string>
     <string name="demo_see">它从镜子里消失后，回头找它</string>
-    <string name="demo_go">最后按 A 执行（开门：外推 3 cm、10 cm）</string>
+    <string name="demo_go">最后按 A 执行（开门：点一下门）</string>
     <string name="msg_turn_more_left">再往左转 %1$d°</string>
     <string name="msg_turn_more_right">再往右转 %1$d°</string>
     <string name="msg_relaxed">两次差一点：阈值放宽到 %1$d°</string>
@@ -191,7 +191,7 @@
     <string name="vol_low">低</string>
     <string name="vol_mid">中</string>
     <string name="vol_high">高</string>
-    <string name="recentre">回正</string>
+    <string name="recentre">车放回面前</string>
     <string name="about">关于</string>
     <string name="about_text">盲区回头 0.1.0 · 全离线 · 教学用，不是驾考、不替代法规 · 字体 Noto Sans（OFL）· 车辆模型 Tripo · 音效自制</string>
     <string name="exit">退出应用</string>
@@ -205,4 +205,13 @@
     <string name="deg">%1$d°</string>
     <string name="traffic_note_right">中国大陆</string>
     <string name="traffic_note_left">香港·英国·日本</string>
+    <string name="how_to_title">怎么操作</string>
+    <string name="how_to_door">开门：手柄射线指着门按扳机，或手势射线 / 眼睛看着门捏一下。点一下就开。</string>
+    <string name="how_to_signal">打灯：左摇杆往左或往右推一下，再推一次关掉。</string>
+    <string name="how_to_execute">变道、起步：右手柄按 A，或点面板上的 [执行]。</string>
+    <string name="how_to_close">关门重来：右手柄按 B，或点面板上的 [关门]。</string>
+    <string name="how_to_look">看镜、回头：直接转眼睛和头，不用按键。</string>
+    <string name="how_to_panel">面板按钮：手柄射线按扳机，或看着按钮捏一下。</string>
+    <string name="how_to">怎么操作</string>
+    <string name="how_to_back">回到设置</string>
 </resources>

@@ -13,6 +13,9 @@ import kotlin.math.sin
  * the grip stops the door at its current angle; [close] (B key / P2 "关门") resets it. "Execute" = the angle crossing
  * 12° (edge into the passing band 0.25 m outside the body).
  *
+ * v0.1.1 (profile D50): [tap] — one tap with the controller ray, the hand ray or eye-hand — opens it fully by itself
+ * (8° in 0.15 s, then 60° in 0.5 s), no push needed; the grip + push path stays for hands that reach the handle.
+ *
  * Angles in degrees, push in metres (outward displacement of the hand since the grab, see [pushDistance]).
  */
 class DoorModel(val cabin: Cabin) {
@@ -28,11 +31,24 @@ class DoorModel(val cabin: Cabin) {
     var lastGrabHand: Hand? = null
         private set
 
+    /** A tap swung the door: it keeps opening to [OPEN_DEG] after the hand is gone, until [close]. */
+    var tapped = false
+        private set
+
+    /** One tap by [hand] (D50): the door opens all the way on its own; [hand] counts as the opening hand. */
+    fun tap(hand: Hand) {
+        lastGrabHand = hand
+        tapped = true
+        target = OPEN_DEG
+    }
+
     /** Time-free update: [dt] s since the last call, [holding] the hand gripping inside the reach sphere, [push] outward m. */
     fun update(dt: Double, holding: Hand?, push: Double): Double {
         if (holding != null && holder == null) lastGrabHand = holding
         holder = holding
-        if (holding == null) {
+        if (tapped) {
+            target = OPEN_DEG
+        } else if (holding == null) {
             target = angle // released: stays where it is
         } else {
             val wanted = if (push >= OPEN_PUSH) OPEN_DEG else if (push >= CRACK_PUSH) CRACK_DEG else 0.0
@@ -48,6 +64,7 @@ class DoorModel(val cabin: Cabin) {
     fun close() {
         angle = 0.0
         target = 0.0
+        tapped = false
     }
 
     /** Outward reach of the door edge beyond the body side at [deg] (m): 8° → 0.16, 60° → 1.0. */

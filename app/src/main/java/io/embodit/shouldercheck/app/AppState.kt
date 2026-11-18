@@ -162,6 +162,8 @@ data class UiState(
     val confirmExit: Boolean = false,
     val confirmClear: Boolean = false,
     val showAbout: Boolean = false,
+    /** Settings: the 「怎么操作」 list instead of the two setting columns (B19). */
+    val showHowTo: Boolean = false,
     val muted: Boolean = false,
     val controllersTracked: Boolean = false,
     val pausedFrom: Base? = null,

@@ -16,13 +16,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pico.spatial.ui.design.Button
 import com.pico.spatial.ui.design.ButtonDefaults
@@ -53,6 +54,7 @@ import io.embodit.shouldercheck.domain.Situation
 import io.embodit.shouldercheck.domain.TrafficSide
 import io.embodit.shouldercheck.domain.VolumeLevel
 import io.embodit.shouldercheck.ui.components.Dim
+import io.embodit.shouldercheck.ui.components.fits
 import io.embodit.shouldercheck.ui.components.Glass
 import io.embodit.shouldercheck.ui.components.LinkButton
 import io.embodit.shouldercheck.ui.components.MinTouch
@@ -104,9 +106,9 @@ private fun ColumnScope.Loading() {
 @Composable
 private fun EyeOffLine(state: UiState, onEvent: (Ev) -> Unit) {
     if (!state.eyeOff) return
-    Row(modifier = Modifier.fillMaxWidth().heightIn(min = MinTouch), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(modifier = Modifier.fillMaxWidth().heightIn(min = MinTouch), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         StatusLabel(R.drawable.ic_eye_off, rs(R.string.by_head), ScColors.Stale, PicoTheme.typography.labelLarge, 18.dp)
-        Text(rs(R.string.eye_off), style = PicoTheme.typography.bodyMedium, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Text(rs(R.string.eye_off), style = PicoTheme.typography.bodyMedium, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("P1#111"), modifier = Modifier.weight(1f))
         LinkButton("eyeEnable", rs(R.string.eye_enable), { onEvent(Ev.EnableEyes) })
     }
 }
@@ -118,7 +120,7 @@ private fun ColumnScope.SitPage(state: UiState, onEvent: (Ev) -> Unit) {
     Text(rs(R.string.app_title), style = PicoTheme.typography.headlineMedium, color = PicoTheme.colorScheme.labelPrimary)
     Spacer(Modifier.height(8.dp))
     Text(rs(R.string.sit_hint), style = PicoTheme.typography.headlineSmall, color = PicoTheme.colorScheme.labelPrimary)
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) { // gate:allow button-gap icon + hint text, no buttons
         Icon(painter = painterResource(R.drawable.ic_eye), contentDescription = null, modifier = Modifier.size(22.dp), tint = PicoTheme.colorScheme.labelPrimary)
         Dim(rs(R.string.eye_hint))
     }
@@ -151,21 +153,21 @@ private fun ColumnScope.RangePage(state: UiState, onEvent: (Ev) -> Unit) {
 
 @Composable
 private fun ColumnScope.HomePage(state: UiState, onEvent: (Ev) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().heightIn(min = MinTouch), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(modifier = Modifier.fillMaxWidth().heightIn(min = MinTouch), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         LinkButton("knowBlind", rs(R.string.know_blind), { onEvent(Ev.OpenLessons(1)) })
         Spacer(Modifier.weight(1f))
         WordButton("mute", rs(if (state.muted) R.string.unmute else R.string.mute), { onEvent(Ev.ToggleMute) }, iconRes = if (state.muted) R.drawable.ic_volume_off else R.drawable.ic_volume)
         WordButton("settings", rs(R.string.settings), { onEvent(Ev.OpenSettings) }, iconRes = R.drawable.ic_settings)
     }
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) { // gate:allow button-gap title + subtitle text, no buttons
         Text(rs(R.string.app_title), style = PicoTheme.typography.headlineMedium, color = PicoTheme.colorScheme.labelPrimary)
         Dim(rs(R.string.home_line), maxLines = 1)
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Card("cardDoor", R.drawable.ic_door, rs(R.string.card_door), rs(R.string.card_door_sub), Modifier.weight(1f)) { onEvent(Ev.OpenLessons(3)) }
         Card("cardLane", R.drawable.ic_car, rs(R.string.card_lane), rs(R.string.card_lane_sub), Modifier.weight(1f)) { onEvent(Ev.OpenLessons(5)) }
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Card("cardRandom", R.drawable.ic_shuffle, rs(R.string.card_random), rs(R.string.card_random_sub), Modifier.weight(1f)) { onEvent(Ev.OpenRandom) }
         Card("cardScores", R.drawable.ic_bar_chart, rs(R.string.card_scores), rs(R.string.card_scores_sub), Modifier.weight(1f)) { onEvent(Ev.OpenScores) }
     }
@@ -188,8 +190,8 @@ private fun Card(name: String, icon: Int, title: String, sub: String, modifier: 
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Icon(painter = painterResource(icon), contentDescription = null, modifier = Modifier.size(32.dp), tint = PicoTheme.colorScheme.labelPrimary)
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = PicoTheme.typography.titleLarge, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(sub, style = PicoTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, style = PicoTheme.typography.titleLarge, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("P1#193"))
+                Text(sub, style = PicoTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("P1#194"))
             }
         }
     }
@@ -232,13 +234,13 @@ private fun LessonRow(n: Int, state: UiState, onEvent: (Ev) -> Unit) {
     Probe("lesson$n", click)
     Button(
         onClick = click,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
-        size = ButtonDefaults.Regular.copy(height = 56.dp, minWidth = 120.dp),
+        modifier = Modifier.fillMaxWidth().height(64.dp),
+        size = ButtonDefaults.Regular.copy(height = 64.dp, minWidth = 120.dp),
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(containerColor = if (state.lessonFocus != 0 && lessonGroup(n) == lessonGroup(state.lessonFocus)) PicoTheme.colorScheme.fillSecondary else PicoTheme.colorScheme.fillTertiary, contentColor = PicoTheme.colorScheme.labelPrimary),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(rs(R.string.lesson_no, n, lessonName(n)), style = PicoTheme.typography.titleSmall, color = PicoTheme.colorScheme.labelPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(rs(R.string.lesson_no, n, lessonName(n)), style = PicoTheme.typography.titleSmall, color = PicoTheme.colorScheme.labelPrimary, maxLines = 2, onTextLayout = fits("P1#243"), modifier = Modifier.weight(1f))
             if (passed) StatusLabel(R.drawable.ic_done, rs(R.string.lesson_passed), ScColors.Done, PicoTheme.typography.labelMedium, 16.dp)
             else StatusLabel(R.drawable.ic_pending, rs(R.string.lesson_open), ScColors.Missing, PicoTheme.typography.labelMedium, 16.dp)
         }
@@ -337,7 +339,7 @@ private fun ColumnScope.ResultPage(state: UiState, ui: ResultUi, onEvent: (Ev) -
 private fun Metric(label: String, value: String, sub: String, modifier: Modifier, small: Boolean = false) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(0.dp)) {
         Dim(label, maxLines = 1)
-        Text(value, style = if (small) PicoTheme.typography.titleLarge else ScType.metric, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, style = if (small) PicoTheme.typography.titleLarge else ScType.metric, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("P1#342"))
         if (sub.isNotEmpty()) Dim(sub, maxLines = 1)
     }
 }
@@ -385,7 +387,7 @@ private fun ColumnScope.ScorePage(state: UiState, onEvent: (Ev) -> Unit) {
     val h = Scorecard.header(p)
     Text(
         rs(R.string.scores_header, h.blindSpotLeft?.let { fmt1(it) } ?: "—", h.blindSpotRight?.let { fmt1(it) } ?: "—", h.rangeLeft?.roundToInt()?.toString() ?: "—", h.rangeRight?.roundToInt()?.toString() ?: "—"),
-        style = PicoTheme.typography.titleMedium, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        style = PicoTheme.typography.titleMedium, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("P1#390"),
     )
     val rows = Scorecard.rows(p.records)
     ScoreRowView(rs(R.string.col_situation), rs(R.string.col_rate), rs(R.string.col_check), rs(R.string.col_turn), rs(R.string.col_miss), null, header = true)
@@ -416,7 +418,7 @@ private fun ScoreRowView(name: String, rate: String, check: String, turn: String
     val style = if (header) PicoTheme.typography.labelLarge else if (bold) PicoTheme.typography.titleMedium else PicoTheme.typography.bodyLarge
     val color = if (header) PicoTheme.colorScheme.labelPrimary else PicoTheme.colorScheme.labelPrimary
     Row(modifier = Modifier.fillMaxWidth().height(42.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(name, style = if (header || bold) style else PicoTheme.typography.bodyMedium, color = color, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(2.2f))
+        Text(name, style = if (header || bold) style else PicoTheme.typography.bodyMedium, color = color, maxLines = 2, onTextLayout = fits("P1#421"), modifier = Modifier.weight(2.2f))
         Text(rate, style = style, color = color, maxLines = 1, modifier = Modifier.weight(1.5f))
         Text(check, style = style, color = color, maxLines = 1, modifier = Modifier.weight(1f))
         Text(turn, style = style, color = color, maxLines = 1, modifier = Modifier.weight(0.9f))
@@ -458,7 +460,9 @@ private fun ColumnScope.SetPage(state: UiState, onEvent: (Ev) -> Unit) {
 private fun ColumnScope.SettingsPage(state: UiState, onEvent: (Ev) -> Unit) {
     val st = state.progress.settings
     TitleRow(rs(R.string.settings_title), trailing = { WordButton("back", rs(R.string.back), { onEvent(Ev.Back) }, iconRes = R.drawable.ic_arrow_back) })
-    Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+    if (state.showHowTo) {
+        HowToList(onEvent)
+    } else Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
         Column(modifier = Modifier.weight(1f)) {
             Text(rs(R.string.col_practice), style = PicoTheme.typography.labelLarge, color = PicoTheme.colorScheme.labelPrimary)
             SettingRow(rs(R.string.show_gaze)) { SwitchProbe("showGaze", st.showGaze) { onEvent(Ev.SetShowGaze(it)) } }
@@ -482,6 +486,7 @@ private fun ColumnScope.SettingsPage(state: UiState, onEvent: (Ev) -> Unit) {
             Row(modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 WordButton("recentre", rs(R.string.recentre), { onEvent(Ev.Recentre) }, iconRes = R.drawable.ic_center)
                 Spacer(Modifier.weight(1f))
+                LinkButton("howTo", rs(R.string.how_to), { onEvent(Ev.ToggleHowTo) })
                 LinkButton("about", rs(R.string.about), { onEvent(Ev.ToggleAbout) })
             }
             ClearRow(state, onEvent)
@@ -500,6 +505,28 @@ private fun ColumnScope.SettingsPage(state: UiState, onEvent: (Ev) -> Unit) {
     }
 }
 
+/** B19 「怎么操作」: one line per main action, icon + how with hands / eyes and how with a controller. */
+@Composable
+private fun ColumnScope.HowToList(onEvent: (Ev) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth().heightIn(min = MinTouch), verticalAlignment = Alignment.CenterVertically) {
+        Text(rs(R.string.how_to_title), style = PicoTheme.typography.titleLarge, color = PicoTheme.colorScheme.labelPrimary, modifier = Modifier.weight(1f))
+        LinkButton("howToBack", rs(R.string.how_to_back), { onEvent(Ev.ToggleHowTo) })
+    }
+    for ((icon, text) in listOf(
+        R.drawable.ic_door to R.string.how_to_door,
+        R.drawable.ic_eye to R.string.how_to_look,
+        R.drawable.ic_skip_next to R.string.how_to_signal,
+        R.drawable.ic_car to R.string.how_to_execute,
+        R.drawable.ic_close to R.string.how_to_close,
+        R.drawable.ic_check to R.string.how_to_panel,
+    )) {
+        Row(modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) { // gate:allow button-gap icon + text rows, no buttons
+            Icon(painter = painterResource(icon), contentDescription = null, modifier = Modifier.size(24.dp), tint = PicoTheme.colorScheme.labelPrimary)
+            Text(rs(text), style = PicoTheme.typography.bodyLarge, color = PicoTheme.colorScheme.labelPrimary, maxLines = 2, onTextLayout = fits("P1#howto"), modifier = Modifier.weight(1f))
+        }
+    }
+}
+
 @Composable
 private fun SwitchProbe(name: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Probe(name) { onChange(!checked) }
@@ -511,8 +538,12 @@ private fun SwitchProbe(name: String, checked: Boolean, onChange: (Boolean) -> U
 private fun VolumeControl(level: VolumeLevel, muted: Boolean, onEvent: (Ev) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         val v = level.ordinal / 2f
-        Box(modifier = Modifier.width(96.dp).heightIn(min = MinTouch), contentAlignment = Alignment.Center) {
-            Slider(value = v, onValueChange = { x -> val l = VolumeLevel.values()[(x * 2).roundToInt().coerceIn(0, 2)]; if (l != level) onEvent(Ev.SetVolume(l)) }, valueRange = 0f..1f)
+        // B20: SpatialUI Slider keeps its first onValueChange, so read level / onEvent through rememberUpdatedState;
+        // steps = 1 lets the slider snap to the three detents itself (a tap lands on the nearest one)
+        val cur by rememberUpdatedState(level)
+        val send by rememberUpdatedState(onEvent)
+        Box(modifier = Modifier.width(120.dp).heightIn(min = MinTouch), contentAlignment = Alignment.Center) {
+            Slider(value = v, onValueChange = { x -> val l = VolumeLevel.values()[(x * 2).roundToInt().coerceIn(0, 2)]; if (l != cur) send(Ev.SetVolume(l)) }, valueRange = 0f..1f, steps = 1, modifier = Modifier.height(48.dp))
         }
         Probe("volLow") { onEvent(Ev.SetVolume(VolumeLevel.LOW)) }
         Probe("volMid") { onEvent(Ev.SetVolume(VolumeLevel.MID)) }

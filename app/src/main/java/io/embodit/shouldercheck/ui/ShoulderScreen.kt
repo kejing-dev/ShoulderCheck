@@ -31,6 +31,8 @@ import io.embodit.shouldercheck.app.DebugCommands
 import io.embodit.shouldercheck.app.Ev
 import io.embodit.shouldercheck.app.UiState
 import io.embodit.shouldercheck.domain.Dir
+import io.embodit.shouldercheck.domain.DoorTargets
+import io.embodit.shouldercheck.domain.Seat
 import io.embodit.shouldercheck.domain.MirrorId
 import io.embodit.shouldercheck.platform.DebugHooks
 import io.embodit.shouldercheck.platform.ScLog
@@ -39,6 +41,14 @@ import io.embodit.shouldercheck.scene.PanelIds
 import io.embodit.shouldercheck.scene.ScFrameSystem
 import io.embodit.shouldercheck.ui.components.LocalScResources
 import io.embodit.shouldercheck.ui.components.localizedResources
+import io.embodit.shouldercheck.ui.input.BoardInputConfig
+import io.embodit.shouldercheck.ui.input.BoardInputListener
+import io.embodit.shouldercheck.ui.input.BoardInputLog
+import io.embodit.shouldercheck.ui.input.InputSource
+import io.embodit.shouldercheck.ui.input.TargetResolver
+import io.embodit.shouldercheck.ui.input.boardInput
+import io.embodit.shouldercheck.ui.input.resolveUp
+import com.pico.spatial.ui.geometry.Offset3D
 import io.embodit.shouldercheck.ui.panels.AngPanel
 import io.embodit.shouldercheck.ui.panels.MirrorPanel
 import io.embodit.shouldercheck.ui.panels.P1Panel
@@ -57,6 +67,7 @@ fun ShoulderScreen() {
     val context = LocalContext.current
     remember(context) {
         AppController.start(context)
+        BoardInputLog.attach(context.applicationContext)
         if ((context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) DebugHooks.handler = DebugCommands::handle
         true
     }
@@ -83,6 +94,7 @@ fun ShoulderScreen() {
                 }
             }
         lifecycle.addObserver(observer)
+        DebugCommands.doorReplay = { src -> replayDoorTap(scene, src) }
         AppController.onQuit = {
             // D26: leave the task, release tracking / audio, end the process
             ScLog.i("QUIT finishAndRemoveTask")
@@ -97,6 +109,7 @@ fun ShoulderScreen() {
         ScLog.i("STAGE enter")
         onDispose {
             lifecycle.removeObserver(observer)
+            DebugCommands.doorReplay = null
             unregisterSystem<ScFrameSystem>()
             scene.detach()
             // the Stage went away without 退出应用: free the SoundPool too (a new one comes with the next start)
@@ -116,9 +129,11 @@ fun ShoulderScreen() {
 private fun Stage(state: UiState, scene: CarScene, onEvent: (Ev) -> Unit) {
     val bindTick = scene.bindTick.intValue
     SpatialView(
-        modifier = Modifier.fillMaxSize(),
+        // D50 (board-input template): the 3D door takes one tap from the controller ray, the hand ray or eye-hand;
+        // this layer only listens to hits on the door holder, so the attachment panels keep their own input
+        modifier = Modifier.fillMaxSize().boardInput(DoorResolver, DoorTapListener, DOOR_INPUT),
         attachments = {
-            AttachmentPanel(PanelIds.P1) { Pool(PanelIds.P1, scene, listOf(state.page, state.language, state.progress, state.confirmExit, state.confirmClear, state.showAbout, state.range, state.eyeOff, state.lessonFocus, state.replayDemo, state.muted)) { P1Panel(state, false, onEvent) } }
+            AttachmentPanel(PanelIds.P1) { Pool(PanelIds.P1, scene, listOf(state.page, state.language, state.progress, state.confirmExit, state.confirmClear, state.showAbout, state.showHowTo, state.range, state.eyeOff, state.lessonFocus, state.replayDemo, state.muted)) { P1Panel(state, false, onEvent) } }
             AttachmentPanel(PanelIds.P1_TALL) { Pool(PanelIds.P1_TALL, scene, listOf(state.page, state.language, state.result, state.progress, state.confirmClear)) { P1Panel(state, true, onEvent) } }
             AttachmentPanel(PanelIds.P2) { Pool(PanelIds.P2, scene, listOf(state.base, state.language, state.hud.situation, state.hud.action, state.hud.message, state.lost)) { P2Panel(state, onEvent) } }
             AttachmentPanel(PanelIds.ANG_L) { Pool(PanelIds.ANG_L, scene, listOf(state.base, state.language)) { AngPanel(state.angLeft, Dir.LEFT) } }
@@ -160,3 +175,31 @@ private fun Pool(id: String, scene: CarScene, refresh: Any?, content: @Composabl
 }
 
 private val REFRESH_STEPS_MS = longArrayOf(1_500L, 2_500L, 4_000L, 4_000L, 8_000L)
+
+/** Hit entity (the door holder or any door mesh below it) -> the seat whose opening door it is. */
+private val DoorResolver: TargetResolver<Seat> = TargetResolver.byName(DoorTargets::resolveName)
+
+private val DOOR_INPUT = BoardInputConfig(logTag = "ShoulderCheck", accept = { e -> resolveUp(e, DoorResolver).first != null })
+
+/** Every door tap — real input and the debug replay — goes through here into [AppController.tapDoor] (via [Ev.TapDoor]). */
+private object DoorTapListener : BoardInputListener<Seat> {
+    override fun onTap(target: Seat?, source: InputSource, position: Offset3D?) {
+        if (target != null) AppController.onEvent(Ev.TapDoor(source.label))
+    }
+}
+
+/**
+ * Debug `tapdoor [controller|hand-ray|eye-hand]`: takes the REAL door entities of the current seat (holder and its
+ * deepest mesh), resolves them up the parent chain like a system hit, and hands the deepest one to the same listener.
+ */
+private fun replayDoorTap(scene: CarScene, src: String): String {
+    val seat = AppController.displayScenario().seat
+    val holder = scene.doorHolder(seat) ?: return "no door holder for $seat"
+    val mesh = runCatching { holder.getChildren().lastOrNull() }.getOrNull() ?: holder
+    val source = InputSource.values().firstOrNull { it.label == src } ?: InputSource.CONTROLLER
+    val (target, path) = resolveUp(mesh, DoorResolver)
+    val line = "REPLAY src=${source.label} path=$path -> door=${target ?: "-"}"
+    BoardInputLog.write("ShoulderCheck", line)
+    DoorTapListener.onTap(target, source, null)
+    return line
+}
