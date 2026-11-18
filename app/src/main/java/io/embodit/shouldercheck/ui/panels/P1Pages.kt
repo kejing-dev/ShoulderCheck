@@ -520,9 +520,9 @@ private fun ColumnScope.HowToList(onEvent: (Ev) -> Unit) {
         R.drawable.ic_close to R.string.how_to_close,
         R.drawable.ic_check to R.string.how_to_panel,
     )) {
-        Row(modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) { // gate:allow button-gap icon + text rows, no buttons
-            Icon(painter = painterResource(icon), contentDescription = null, modifier = Modifier.size(24.dp), tint = PicoTheme.colorScheme.labelPrimary)
-            Text(rs(text), style = PicoTheme.typography.bodyLarge, color = PicoTheme.colorScheme.labelPrimary, maxLines = 2, onTextLayout = fits("P1#howto"), modifier = Modifier.weight(1f))
+        Row(modifier = Modifier.fillMaxWidth().heightIn(min = 34.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) { // gate:allow button-gap icon + text rows, no buttons
+            Icon(painter = painterResource(icon), contentDescription = null, modifier = Modifier.size(22.dp), tint = PicoTheme.colorScheme.labelPrimary)
+            Text(rs(text), style = PicoTheme.typography.bodyMedium, color = PicoTheme.colorScheme.labelPrimary, maxLines = 2, onTextLayout = fits("P1#howto"), modifier = Modifier.weight(1f))
         }
     }
 }
@@ -539,11 +539,11 @@ private fun VolumeControl(level: VolumeLevel, muted: Boolean, onEvent: (Ev) -> U
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         val v = level.ordinal / 2f
         // B20: SpatialUI Slider keeps its first onValueChange, so read level / onEvent through rememberUpdatedState;
-        // steps = 1 lets the slider snap to the three detents itself (a tap lands on the nearest one)
+        // the value is rounded to the nearest of the three detents (a tap lands on the nearest one)
         val cur by rememberUpdatedState(level)
         val send by rememberUpdatedState(onEvent)
         Box(modifier = Modifier.width(120.dp).heightIn(min = MinTouch), contentAlignment = Alignment.Center) {
-            Slider(value = v, onValueChange = { x -> val l = VolumeLevel.values()[(x * 2).roundToInt().coerceIn(0, 2)]; if (l != cur) send(Ev.SetVolume(l)) }, valueRange = 0f..1f, steps = 1, modifier = Modifier.height(48.dp))
+            Slider(value = v, onValueChange = { x -> val l = VolumeLevel.values()[(x * 2).roundToInt().coerceIn(0, 2)]; if (l != cur) send(Ev.SetVolume(l)) }, valueRange = 0f..1f, modifier = Modifier.height(48.dp))
         }
         Probe("volLow") { onEvent(Ev.SetVolume(VolumeLevel.LOW)) }
         Probe("volMid") { onEvent(Ev.SetVolume(VolumeLevel.MID)) }

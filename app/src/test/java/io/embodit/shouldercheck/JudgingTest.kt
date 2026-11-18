@@ -263,6 +263,50 @@ class JudgingTest {
         assertEquals(Outcome.LUCKY, r2.outcome)
     }
 
+    /** v0.1.1 (D50): mirror + shoulder check, then ONE tap on the door — no grip, no push — opens it fully. */
+    private fun tapRun(s: Scenario, hand: Hand, tapAt: Double): Pair<QuestionJudge, TestDriver> {
+        val judge = QuestionJudge(s, JudgeMode.EYE, profile60())
+        val d = TestDriver(judge)
+        d.until(maxOf(0.0, tapAt - 2.5))
+        d.gazeAt(s.cabin.mirror(MirrorId.LEFT)!!.pos, 0.2)
+        shoulder(d, -64.0, 0.25)
+        d.until(tapAt)
+        d.tap = hand
+        d.step()
+        return judge to d
+    }
+
+    @Test
+    fun u6b_oneTapOpensTheDoorAndCountsTheTappingHand() {
+        val spec = HazardSpec(ActorKind.BIKE, Dir.LEFT, 6.0, 5.0)
+        val s = doorScene(spec)
+        val pass = s.hazardPassTime!!
+        val (judge, d) = tapRun(s, Hand.RIGHT, tapAt = pass + 3.5)
+        // nothing held, nothing pushed after the tap: the door keeps opening by itself
+        d.hold(0.7)
+        assertEquals(DoorModel.OPEN_DEG, judge.doorAngle, 1e-6)
+        d.finish()
+        val r = judge.result()
+        assertEquals(Outcome.CLEAR, r.outcome)
+        assertTrue(step(r, Step.FAR_HAND).done)
+        assertNotNull(r.execTime)
+
+        // tapped with the near hand: the door still opens, the far-hand step is wrong
+        val (judge2, d2) = tapRun(doorScene(spec), Hand.LEFT, tapAt = pass + 3.5)
+        d2.finish()
+        val r2 = judge2.result()
+        assertTrue(step(r2, Step.FAR_HAND).wrong)
+        assertNotNull(r2.execTime)
+
+        // [关门] after a tap that had not executed yet shuts it (tap latch cleared)
+        val m = DoorModel(s.cabin)
+        m.tap(Hand.RIGHT)
+        m.update(0.05, null, 0.0)
+        m.close()
+        m.update(1.0, null, 0.0)
+        assertEquals(0.0, m.angle, 1e-9)
+    }
+
     @Test
     fun u7_doorSweepConflictOnlyPast12Degrees() {
         // e-bike riding 0.85 m outside the body at 4 m/s; its front reaches the door at ~3.5 s

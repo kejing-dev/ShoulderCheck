@@ -23,6 +23,9 @@ class TestDriver(val judge: QuestionJudge, private val hz: Double = 72.0) {
     var signal = Signal.OFF
     var grab: Hand? = null
     var push = 0.0
+
+    /** A door tap by this hand on the next sample only (D50). */
+    var tap: Hand? = null
     var eyeOff = false
     var gazeTarget: Vec3? = null
     val events = ArrayList<JudgeEvent>()
@@ -39,7 +42,8 @@ class TestDriver(val judge: QuestionJudge, private val hz: Double = 72.0) {
     }
 
     fun step(exec: Boolean = false): LiveStatus {
-        val s = judge.update(JudgeSample(t = t, headYaw = yaw, headPitch = pitch, gaze = gaze(), signal = signal, grab = grab, push = push, exec = exec))
+        val s = judge.update(JudgeSample(t = t, headYaw = yaw, headPitch = pitch, gaze = gaze(), signal = signal, grab = grab, push = push, exec = exec, doorTap = tap))
+        tap = null
         events += s.events
         last = s
         t += dt

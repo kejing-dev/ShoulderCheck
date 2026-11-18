@@ -1123,8 +1123,8 @@ object AppController {
         if (controller) lastTriggerMs[hand] = nowMs else lastPinchMs[hand] = nowMs
     }
 
+    /** Logcat (tag ShoulderCheck) + files/input-log.txt, which survives the headset's logcat flood (board-input README). */
     private fun log(msg: String): String {
-        ScLog.i(msg)
         BoardInputLog.write("ShoulderCheck", msg)
         return msg
     }
