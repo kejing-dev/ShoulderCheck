@@ -15,8 +15,8 @@ enum class Language {
 
 /** Master volume steps (design: 低 / 中 / 高). */
 enum class VolumeLevel(val gain: Double) {
-    LOW(0.35),
-    MID(0.65),
+    LOW(0.5),
+    MID(0.9),  // v0.1.1: 0.65 rendered an active RMS of −22.6 dBFS (B20 wants ≥ −20)
     HIGH(1.0),
 }
 

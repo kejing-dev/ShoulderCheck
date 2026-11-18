@@ -21,7 +21,7 @@ class Audio(context: Context) {
     private val ids = HashMap<String, Int>()
     private val loaded = HashSet<Int>()
     private val main = Handler(Looper.getMainLooper())
-    private var gain = 0.65f
+    private var gain = 0.9f
     private var bedStream = 0
     private var bedWanted = false
     private var indicatorOn = false
