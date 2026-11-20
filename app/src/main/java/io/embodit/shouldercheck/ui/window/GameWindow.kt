@@ -145,7 +145,7 @@ private fun PracticePage(state: UiState, onEvent: (Ev) -> Unit) {
     val p = state.progress
     val lv = state.practiceLevel.coerceIn(1, Levels.COUNT)
     val unlocked = lv <= p.unlocked
-    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) { // D44 blank ≤ 25 %: the block spans the window, gaps shared evenly (no band > 20 %)
         Header(rs(R.string.app_title), state, onEvent)
         Text(rs(R.string.tagline), style = PicoTheme.typography.titleMedium, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("S30#tagline"))
         Dim(rs(R.string.next_step), maxLines = 2)
@@ -190,7 +190,7 @@ private fun PracticePage(state: UiState, onEvent: (Ev) -> Unit) {
 @Composable
 private fun GameOverPage(state: UiState, onEvent: (Ev) -> Unit) {
     val s = state.summary ?: return
-    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) { // D44 blank ≤ 25 %: the block spans the window, gaps shared evenly (no band > 20 %)
         Header(if (s.daily) rs(R.string.daily) else rs(R.string.level_label, s.level) + " · " + levelName(s.level), state, onEvent)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) { // gate:allow button-gap score + stars, no buttons
             Text(fmt(s.total), style = PicoTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold, fontSize = 56.sp, lineHeight = 64.sp, fontFeatureSettings = "tnum, lnum"), color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("S20#total"))
@@ -222,7 +222,7 @@ private fun GameOverPage(state: UiState, onEvent: (Ev) -> Unit) {
 
 @Composable
 private fun PausePage(state: UiState, onEvent: (Ev) -> Unit) {
-    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) { // D44 blank ≤ 25 %: the block spans the window, gaps shared evenly (no band > 20 %)
         Header(rs(R.string.pause_title), state, onEvent)
         if (state.lost) Text(rs(R.string.lost), style = PicoTheme.typography.titleMedium, color = PicoTheme.colorScheme.labelPrimary, maxLines = 2, onTextLayout = fits("S50#lost"))
         else if (state.pausedDaily) Dim(rs(R.string.daily_pause_note), maxLines = 1)
@@ -260,7 +260,7 @@ private fun PausePage(state: UiState, onEvent: (Ev) -> Unit) {
 
 @Composable
 private fun UnavailablePage(onEvent: (Ev) -> Unit) {
-    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween, horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(painter = painterResource(R.drawable.ic_warning), contentDescription = null, modifier = Modifier.size(160.dp), tint = PicoTheme.colorScheme.labelPrimary)
         Spacer(Modifier.height(24.dp))
         Text(rs(R.string.app_title), style = PicoTheme.typography.headlineMedium, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("S53#title"))
@@ -276,7 +276,7 @@ private fun UnavailablePage(onEvent: (Ev) -> Unit) {
 @Composable
 private fun RecordsPage(state: UiState) {
     val p = state.progress
-    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) { // D44 blank ≤ 25 %: the block spans the window, gaps shared evenly (no band > 20 %)
         Text(rs(R.string.records_title), style = PicoTheme.typography.headlineMedium, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("S32#title"))
         Spacer(Modifier.height(16.dp))
         for (n in 1..Levels.COUNT) {
