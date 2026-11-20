@@ -323,6 +323,15 @@ class CheckJudge(val round: Round, val mode: JudgeMode, val thresholds: Threshol
         const val LOOK_FORWARD = 35.0
 
         fun lookingForward(headYaw: Double): Boolean = abs(headYaw) <= LOOK_FORWARD
+
+        /**
+         * May this tap commit the round? Driving rounds: 「走」 only with the head back within ±35°. Door rounds
+         * (v0.2.1, QA #2 q2-1): tapping the inner handle IS opening the door, whatever the head yaw. The handle sits
+         * 66° left / 36° down of the eye, so looking at it (eye-hand) always means a turned head; the door is opened
+         * while looking back, which is the whole point. No head pose yet also passes (the old behaviour).
+         */
+        fun goAllowed(situation: Situation, headYaw: Double?): Boolean =
+            situation == Situation.DOOR || headYaw == null || lookingForward(headYaw)
     }
 }
 

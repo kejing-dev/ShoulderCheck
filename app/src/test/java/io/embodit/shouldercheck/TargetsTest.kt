@@ -1,6 +1,9 @@
 package io.embodit.shouldercheck
 
 import io.embodit.shouldercheck.domain.Cabin
+import io.embodit.shouldercheck.domain.CheckJudge
+import io.embodit.shouldercheck.domain.Situation
+import io.embodit.shouldercheck.ui.input.InputSource
 import io.embodit.shouldercheck.domain.DoorModel
 import io.embodit.shouldercheck.domain.DoorTargets
 import io.embodit.shouldercheck.domain.HudLayout
@@ -14,6 +17,7 @@ import io.embodit.shouldercheck.domain.targetOfName
 import io.embodit.shouldercheck.ui.input.parseLoggedPath
 import io.embodit.shouldercheck.ui.input.resolvePath
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -88,5 +92,25 @@ class TargetsTest {
         val go = spots.first { it.target == Target.GO }
         val pause = spots.first { it.target == Target.PAUSE }
         assertNull(DoorTargets.rayHit(hand, (go.centre - hand).normalized(), hotspotBox(pause)))
+    }
+
+    /**
+     * v0.2.1 QA #2 q2-1 (user: 「门推不动」): in a door round one tap on the inner handle opens the door with the head
+     * turned −74° toward it, for all three inputs (controller ray, hand ray, eye-hand). ±35° stays for driving 「走」.
+     */
+    @Test
+    fun doorOpensWithHeadTurnedForAllThreeInputs() {
+        val handlePath = "door:handle/door-nearFront-handle < door:handle < door-nearFront < cabin < car"
+        for (src in listOf(InputSource.CONTROLLER, InputSource.HAND_RAY, InputSource.EYE_HAND)) {
+            val target = resolvePath(parseLoggedPath(handlePath), ::targetOfName)
+            assertEquals("$src hits the handle", Target.DOOR, target)
+            for (yaw in listOf(-74.0, -66.0, -35.0, 0.0, 40.0)) assertTrue("$src door yaw=$yaw", CheckJudge.goAllowed(Situation.DOOR, yaw))
+        }
+        assertTrue(CheckJudge.goAllowed(Situation.DOOR, null))
+        // driving rounds keep the look-forward check on 「走」
+        for (s in Situation.values().filter { it != Situation.DOOR }) {
+            assertFalse("$s yaw -74", CheckJudge.goAllowed(s, -74.0))
+            assertTrue("$s yaw -20", CheckJudge.goAllowed(s, -20.0))
+        }
     }
 }

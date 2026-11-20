@@ -17,7 +17,7 @@ games (TabBar 练习 · 成绩 · 设置). A round on screen has no 2D panel: it
   traps per level, 1–2 clear, first-ever game starts with a clear LC_L; no door traps — see deviations).
 - `Checks.kt`: `CheckJudge` (mirror: eye dwell 120 ms on the glass +50 % / head yaw in the mirror band 20° fwd 8° back,
   250 ms; shoulder: yaw ≥ T 150 ms; fresh 4 s / 3 s; sawHazard; 10 Hz trace), `Thresholds` (head 65/80, eye 80/95;
-  floor mirror + 10°; honest near-miss −5°, 5 easy +5°), `lookingForward` ±35°.
+  floor mirror + 10°; honest near-miss −5°, 5 easy +5°), `lookingForward` ±35° for 「走」 in driving rounds only; `goAllowed` lets door rounds open on one tap at any head yaw (v0.2.1).
 - `Scoring.kt`: `Scoring.judge` → `RoundResult` (SAFE 100 / WAITED 120 + reaction max(0, 50 − 25 Δt), ★★ (+★ if Δt ≤ 1.5 s),
   LUCKY 30 ★, MISS / TIMEOUT 0; combo ×1.5 at 3, ×2 at 5), `Session` (8 results, `summary`), unlock at ≥ 2 stars.
 - `Progress.kt`: settings, thresholds, best per level, unlock, today's run, last 50 games ⇄ `ProgressCodec` (v0.1 data

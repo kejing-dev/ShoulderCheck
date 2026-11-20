@@ -648,9 +648,9 @@ object AppController {
         val r = run ?: return
         if (r.tGo != null) return
         val head = effHead
-        if (head != null && !CheckJudge.lookingForward(head.yaw)) {
+        if (!CheckJudge.goAllowed(r.round.situation, head?.yaw)) {
             update { it.copy(hud = it.hud.copy(goShakeMs = nowMs, lookForwardUntilMs = nowMs + 1500)) }
-            log(String.format(Locale.US, "GO refused: head yaw %.0f (look forward first)", head.yaw))
+            log(String.format(Locale.US, "GO refused: head yaw %.0f (look forward first)", head?.yaw ?: 0.0))
             return
         }
         r.tGo = r.t

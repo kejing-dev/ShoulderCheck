@@ -416,9 +416,10 @@ internal class Hud3D(
             Outcome.WAITED -> r.getString(R.string.out_waited) to ScColors.Go.toArgb()
             Outcome.LUCKY -> r.getString(R.string.out_lucky) to ScColors.Lucky.toArgb()
             Outcome.MISS -> r.getString(R.string.out_miss) to ScColors.MissLight.toArgb()
-            Outcome.TIMEOUT -> r.getString(R.string.out_timeout) to ScColors.GoIdle.toArgb()
+            Outcome.TIMEOUT -> r.getString(R.string.out_timeout) to ScColors.TimeoutTitle.toArgb()
         }
-        TextPaint.roundRect(cv, 0f, 0f, w.toFloat(), h.toFloat(), 48f, TextPaint.argb(215, 16, 18, 22))
+        // v0.2.1 (QA #2 q2-2): 240 instead of 215 so the road / cars behind show through less
+        TextPaint.roundRect(cv, 0f, 0f, w.toFloat(), h.toFloat(), 48f, TextPaint.argb(240, 16, 18, 22))
         val stars = if (p.outcome == Outcome.TIMEOUT || p.outcome == Outcome.MISS) "" else "★".repeat(p.stars) + "☆".repeat(3 - p.stars) + "  "
         val points = if (p.points > 0) "  " + r.getString(R.string.res_points, p.points) else ""
         TextPaint.line(cv, r, stars + word + points, w / 2f, h * 0.42f, 118f, colour, w * 0.94f, 700)

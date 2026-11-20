@@ -44,6 +44,7 @@ object ScColors {
     val Go = Color(0xFF2FBF71) // design-style: fixed-figma-color 「走」 lit text (green on the dark capsule 6.4:1)
     val GoBody = Color(0xFF22262B) // design-style: fixed-figma-color 「走」 capsule body (dark grey)
     val GoIdle = Color(0xFF9AA1A9) // design-style: fixed-figma-color 「走」 not ready (grey text 5.8:1 on the body)
+    val TimeoutTitle = Color(0xFFF2F4F7) // design-style: fixed-figma-color 「太晚了」 title (v0.2.1 q2-2: #9AA1A9 was 2.5:1 on the measured #545F69; this is 5.9:1 there, 14:1 on the card)
     val TimerLate = Color(0xFFF08A24) // design-style: fixed-figma-color timer ring last 30 % (orange)
     val ChipOn = Color(0xFF1E6E40) // design-style: fixed-figma-color 「镜」「回头」 lit (white text 6.3:1)
     val MissLight = Color(0xFFFF7052) // design-style: fixed-figma-color 「险情」 word on the dark pop (4.8:1)
