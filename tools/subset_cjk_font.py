@@ -24,14 +24,14 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 STRING_FILES = [
     os.path.join(ROOT, "app", "src", "main", "res", "values", "strings.xml"),
     os.path.join(ROOT, "app", "src", "main", "res", "values-zh", "strings.xml"),
-    # lesson names (zh) live in the content table, not in strings.xml
-    os.path.join(ROOT, "app", "src", "main", "java", "io", "embodit", "shouldercheck", "domain", "Content.kt"),
+    # the 3D HUD draws a few symbols itself (stars, ticks, arrows)
+    os.path.join(ROOT, "app", "src", "main", "java", "io", "embodit", "shouldercheck", "scene", "Hud3D.kt"),
 ]
 # CJK punctuation and the symbols the UI draws next to readings (grade glyphs, warnings, arrows).
 EXTRA = (
     "，。、；：？！…—·（）《》〈〉“”‘’「」『』【】｜　～"
     "◆●○▲△■□◌✓✋⦸↔↕←→↑↓′″±×÷°‰№"
-    "一二三四五六七八九十百千万零两个米厘毫英尺寸⟲✦"
+    "一二三四五六七八九十百千万零两个米厘毫英尺寸⟲✦★☆›‹▶◀"
 )
 OFL_HEADER = "Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.\n\n"
 OFL_BODY = """This Font Software is licensed under the SIL Open Font License, Version 1.1.

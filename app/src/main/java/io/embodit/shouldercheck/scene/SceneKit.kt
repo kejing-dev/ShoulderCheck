@@ -88,11 +88,8 @@ internal const val DP_M = 0.0008
 internal class SharedResources {
     private val owned = ArrayList<Resource>()
 
-    fun <T : Resource> keep(resource: T): T {
-        resource.toGlobal()
-        owned += resource
-        return resource
-    }
+    /** D59: every cached resource is made global here (the one helper the scene creates resources through). */
+    fun <T : Resource> keep(resource: T): T = resource.also { it.toGlobal(); owned += it }
 
     fun close() {
         owned.forEach { runCatching { it.close() } }
@@ -295,6 +292,76 @@ internal object Meshes {
         return b.build(name)
     }
 
+    /**
+     * Point on a stadium (rounded-end rectangle) outline of [w] × [h], local XY: u 0 → 1 runs once round it, starting at
+     * the top centre and going clockwise as seen from +Z. The ends are semicircles of radius h / 2.
+     */
+    fun stadiumPoint(u: Double, w: Double, h: Double): Vec3 {
+        val r = h / 2
+        val straight = (w - h).coerceAtLeast(0.0)
+        val total = 2 * straight + 2 * PI * r
+        var d = ((u % 1.0 + 1.0) % 1.0) * total
+        // top edge, right half
+        if (d < straight / 2) return Vec3(d, r, 0.0)
+        d -= straight / 2
+        if (d < PI * r) {
+            val a = PI / 2 - d / r
+            return Vec3(straight / 2 + r * cos(a), r * sin(a), 0.0)
+        }
+        d -= PI * r
+        if (d < straight) return Vec3(straight / 2 - d, -r, 0.0)
+        d -= straight
+        if (d < PI * r) {
+            val a = -PI / 2 - d / r
+            return Vec3(-straight / 2 + r * cos(a), r * sin(a), 0.0)
+        }
+        d -= PI * r
+        return Vec3(-straight / 2 + d, r, 0.0)
+    }
+
+    /** The 「走」 button body: a stadium [w] × [h], [d] deep, front face at z = +d/2 (smooth rounded ends, 16 segments each). */
+    fun stadium(name: String, w: Double, h: Double, d: Double, seg: Int = 48): MeshResource {
+        val b = MeshBuilder()
+        val front = Vec3(0.0, 0.0, 1.0)
+        val back = Vec3(0.0, 0.0, -1.0)
+        val pts = (0 until seg).map { stadiumPoint(it.toDouble() / seg, w, h) }
+        val cf = b.vertex(Vec3(0.0, 0.0, d / 2), front, 0.5, 0.5)
+        val cb = b.vertex(Vec3(0.0, 0.0, -d / 2), back, 0.5, 0.5)
+        for (i in 0 until seg) {
+            val p0 = pts[i]
+            val p1 = pts[(i + 1) % seg]
+            val f0 = b.vertex(p0 + Vec3(0.0, 0.0, d / 2), front, 0.5 + p0.x / w, 0.5 + p0.y / h)
+            val f1 = b.vertex(p1 + Vec3(0.0, 0.0, d / 2), front, 0.5 + p1.x / w, 0.5 + p1.y / h)
+            b.tri(cf, f0, f1, front)
+            val k0 = b.vertex(p0 - Vec3(0.0, 0.0, d / 2), back, 0.5 + p0.x / w, 0.5 + p0.y / h)
+            val k1 = b.vertex(p1 - Vec3(0.0, 0.0, d / 2), back, 0.5 + p1.x / w, 0.5 + p1.y / h)
+            b.tri(cb, k0, k1, back)
+            val n = Vec3(p0.x + p1.x, p0.y + p1.y, 0.0).normalized()
+            b.quad(p0 + Vec3(0.0, 0.0, d / 2), p1 + Vec3(0.0, 0.0, d / 2), p1 - Vec3(0.0, 0.0, d / 2), p0 - Vec3(0.0, 0.0, d / 2), n)
+        }
+        return b.build(name)
+    }
+
+    /**
+     * One piece of the timer ring round the 「走」 button: the band between the stadium outlines [outerW] × [outerH] and
+     * the same shrunk by [band], from u0 to u1 of the way round (true curved band, 6 sub-steps per piece).
+     */
+    fun stadiumBand(name: String, outerW: Double, outerH: Double, band: Double, u0: Double, u1: Double): MeshResource {
+        val b = MeshBuilder()
+        val n = Vec3(0.0, 0.0, 1.0)
+        val steps = 6
+        for (i in 0 until steps) {
+            val a = u0 + (u1 - u0) * i / steps
+            val c = u0 + (u1 - u0) * (i + 1) / steps
+            val o0 = stadiumPoint(a, outerW, outerH)
+            val o1 = stadiumPoint(c, outerW, outerH)
+            val i0 = stadiumPoint(a, outerW - 2 * band, outerH - 2 * band)
+            val i1 = stadiumPoint(c, outerW - 2 * band, outerH - 2 * band)
+            b.quad(i0, i1, o1, o0, n)
+        }
+        return b.build(name)
+    }
+
     /** Upright quad, local XY, facing +Z, centred, 1 × 1 (the F↑ wall test card). */
     fun quad(name: String): MeshResource =
         MeshBuilder().apply { quad(Vec3(-0.5, -0.5, 0.0), Vec3(0.5, -0.5, 0.0), Vec3(0.5, 0.5, 0.0), Vec3(-0.5, 0.5, 0.0), Vec3(0.0, 0.0, 1.0)) }.build(name)
@@ -398,6 +465,32 @@ internal object Textures {
             val high = ScColors.SkyHigh
             val c = if (elev < -2) ScColors.Sidewalk.shade(0.8f) else Color(low.red + (high.red - low.red) * t, low.green + (high.green - low.green) * t, low.blue + (high.blue - low.blue) * t, 1f)
             for (x in 0 until 4) bmp.setPixel(x, y, c.argb())
+        }
+        return bmp
+    }
+
+    /** Dusk sky (level 4): deep blue overhead, a warm band at the horizon. */
+    fun duskSky(h: Int = 256): Bitmap {
+        val bmp = Bitmap.createBitmap(4, h, Bitmap.Config.ARGB_8888)
+        for (y in 0 until h) {
+            val elev = 90.0 - 180.0 * y / (h - 1)
+            val t = (elev / 50.0).coerceIn(0.0, 1.0).toFloat()
+            val low = ScColors.DuskLow
+            val high = ScColors.DuskHigh
+            val c = if (elev < -2) ScColors.Sidewalk.shade(0.3f) else Color(low.red + (high.red - low.red) * t, low.green + (high.green - low.green) * t, low.blue + (high.blue - low.blue) * t, 1f)
+            for (x in 0 until 4) bmp.setPixel(x, y, c.argb())
+        }
+        return bmp
+    }
+
+    /** Vignette: clear in the middle, dark towards the edges (alpha only), for the 25 % lane-change vignette. */
+    fun vignette(size: Int = 128): Bitmap {
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val c = (size - 1) / 2f
+        for (y in 0 until size) for (x in 0 until size) {
+            val r = kotlin.math.hypot(x - c, y - c) / c
+            val a = ((r - 0.45f) / 0.55f).coerceIn(0f, 1f)
+            bmp.setPixel(x, y, android.graphics.Color.argb((a * a * 255).toInt(), 0, 0, 0))
         }
         return bmp
     }

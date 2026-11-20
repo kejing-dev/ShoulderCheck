@@ -5,15 +5,14 @@ import kotlin.math.sin
 
 /**
  * Road users (design `gateBDecisions.models`, sizes L × W × H in metres). [model] is the role key of
- * `assets/models/calibration.json`; BUS has no GLB (procedural box, lesson 5 context only).
+ * `assets/models/calibration.json`.
  */
-enum class ActorKind(val length: Double, val width: Double, val height: Double, val rider: Boolean, val model: String?) {
+enum class ActorKind(val length: Double, val width: Double, val height: Double, val rider: Boolean, val model: String) {
     SEDAN(4.6, 1.8, 1.45, false, "sedan"),
     SUV(4.7, 1.9, 1.7, false, "suv"),
     EBIKE(1.7, 0.7, 1.7, true, "ebike"),
     BIKE(1.75, 0.6, 1.75, true, "bike"),
     MOTO(2.0, 0.8, 1.6, true, "moto"),
-    BUS(12.0, 2.5, 3.2, false, null),
     ;
 
     companion object {
@@ -24,7 +23,6 @@ enum class ActorKind(val length: Double, val width: Double, val height: Double, 
                 "ebike", "e-bike" -> EBIKE
                 "bike", "bicycle" -> BIKE
                 "moto", "motorcycle" -> MOTO
-                "bus" -> BUS
                 else -> null
             }
     }
@@ -198,17 +196,15 @@ data class Strip(val type: StripType, val xMin: Double, val xMax: Double) {
  * Road layout of a scene (physical x, after the traffic-side mirror). [strips] from left to right; [dashedLines] /
  * [solidLines] are the painted line x positions; [kerbX] is the kerb edge; the street runs along z.
  *
- * Design-frame layouts (right-hand traffic, c = car centre x):
- * - lane scenes / lessons 1–2: three lanes c−5.25 … c+5.25, bike lane to c+7.75, kerb;
- * - pull-out: you are in the kerb lane c−1.75 … c+1.75 (kerb at c+1.75), target lane on the left;
- * - right turn: ego (right-most) lane, bike lane c+1.75 … c+4.25, kerb;
- * - door, driver: parking strip c−1.25 … c+1.25 by the right kerb, traffic lane on the left;
- * - door, rear seat: ego lane to the body side + 0.2, bike lane 2.2 m on the right, kerb.
+ * Design-frame layouts (right-hand traffic, c = car centre x = +0.37 from the driver's eye):
+ * - lane change: three lanes c−5.25 … c+5.25, bike lane to c+7.75, kerb;
+ * - pull out: you are parked in the kerb strip c−1.75 … c+1.75 (kerb at c+1.75), two lanes on the left;
+ * - merge: you are in the acceleration lane c−1.75 … c+1.75 (dashed line to the main road), two main lanes on the left;
+ * - door: parked strip c−1.25 … c+1.25 by the kerb, bike lane c−2.75 … c−1.25 next to your door, two lanes beyond.
  */
 class RoadLayout(val situation: Situation, val side: TrafficSide) {
-    val seat: Seat = situation.seat
     private val m = side.m
-    private val c = (if (seat == Seat.DRIVER) 0.37 else -0.37)
+    private val c = 0.37
 
     val strips: List<Strip>
     val dashedLines: List<Double>
@@ -225,36 +221,28 @@ class RoadLayout(val situation: Situation, val side: TrafficSide) {
                 s += StripType.LANE to doubleArrayOf(c - 8.75, c - 5.25)
                 s += StripType.LANE to doubleArrayOf(c - 5.25, c - 1.75)
                 s += StripType.PARKING to doubleArrayOf(c - 1.75, c + 1.75)
-                dashed += listOf(c - 5.25, c - 1.75)
-                solid += c - 8.75
+                dashed += listOf(c - 5.25)
+                solid += listOf(c - 8.75, c - 1.75)
                 kerb = c + 1.75
             }
-            Situation.RIGHT_TURN -> {
+            Situation.MERGE -> {
+                s += StripType.LANE to doubleArrayOf(c - 8.75, c - 5.25)
                 s += StripType.LANE to doubleArrayOf(c - 5.25, c - 1.75)
                 s += StripType.EGO_LANE to doubleArrayOf(c - 1.75, c + 1.75)
-                s += StripType.BIKE_LANE to doubleArrayOf(c + 1.75, c + 4.25)
-                dashed += c - 1.75
-                solid += listOf(c - 5.25, c + 1.75)
-                kerb = c + 4.25
+                dashed += listOf(c - 5.25, c - 1.75)
+                solid += listOf(c - 8.75, c + 1.75)
+                kerb = c + 2.25
             }
-            Situation.DOOR_DRIVER -> {
-                s += StripType.LANE to doubleArrayOf(c - 8.25, c - 4.75)
-                s += StripType.LANE to doubleArrayOf(c - 4.75, c - 1.25)
+            Situation.DOOR -> {
+                s += StripType.LANE to doubleArrayOf(c - 9.75, c - 6.25)
+                s += StripType.LANE to doubleArrayOf(c - 6.25, c - 2.75)
+                s += StripType.BIKE_LANE to doubleArrayOf(c - 2.75, c - 1.25)
                 s += StripType.PARKING to doubleArrayOf(c - 1.25, c + 1.25)
-                dashed += c - 4.75
-                solid += listOf(c - 8.25, c - 1.25)
+                dashed += c - 6.25
+                solid += listOf(c - 9.75, c - 2.75, c - 1.25)
                 kerb = c + 1.25
             }
-            Situation.DOOR_REAR -> {
-                val body = c + 0.91
-                s += StripType.LANE to doubleArrayOf(body + 0.2 - 7.0, body + 0.2 - 3.5)
-                s += StripType.EGO_LANE to doubleArrayOf(body + 0.2 - 3.5, body + 0.2)
-                s += StripType.BIKE_LANE to doubleArrayOf(body + 0.2, body + 2.4)
-                dashed += body + 0.2 - 3.5
-                solid += listOf(body + 0.2 - 7.0, body + 0.2)
-                kerb = body + 2.4
-            }
-            else -> {
+            Situation.LANE_LEFT, Situation.LANE_RIGHT -> {
                 s += StripType.LANE to doubleArrayOf(c - 5.25, c - 1.75)
                 s += StripType.EGO_LANE to doubleArrayOf(c - 1.75, c + 1.75)
                 s += StripType.LANE to doubleArrayOf(c + 1.75, c + 5.25)
@@ -272,28 +260,40 @@ class RoadLayout(val situation: Situation, val side: TrafficSide) {
         kerbX = kerb * m
     }
 
-    /** Ego car centre x. */
+    /** Ego car centre x (physical). */
     val egoX: Double
         get() = c * m
 
-    /** Centre x of the lane next to yours on [dir] (lane scenes). */
+    /** Centre x of the lane next to yours on [dir]. */
     fun adjacentLaneX(dir: Dir): Double = egoX + dir.sign * Road.LANE_WIDTH
 
+    /** Centre x of the lane you move into (lane scenes) — door: the bike lane next to the door. */
+    fun targetX(dir: Dir): Double =
+        when (situation) {
+            Situation.DOOR -> (c - 2.0) * m
+            else -> egoX + dir.sign * Road.LANE_WIDTH
+        }
+
     /**
-     * Where a hazard of [kind] rides on [dir] in this scene (physical x of its box centre).
-     * Design frame: lane scenes −3.13 / +3.87 (lane centres); right turn: bike lane, riders at c + 2.65;
-     * door (driver): riders 0.85 m outside the body (−1.39), cars at −2.0; door (rear): riders at body + 0.80 (+1.34).
+     * Where a road user of [kind] rides on [dir] in this scene (physical x of its box centre).
+     * Design frame: lane scenes: the lane centre beside you; pull out: riders keep 0.85 m off the parked cars
+     * (c − 2.6), cars the lane centre; door: riders 0.85 m outside your body (−1.39), cars in the far lane (c − 4.5).
      */
     fun hazardX(kind: ActorKind, dir: Dir): Double {
-        val d = dir.sign.toDouble()
         val sideIsDesignLeft = (dir.sign * m) < 0
         return when (situation) {
-            Situation.RIGHT_TURN -> if (!sideIsDesignLeft) (c + 2.65) * m else (c - 3.5) * m
-            Situation.DOOR_DRIVER ->
-                if (sideIsDesignLeft) (if (kind.rider) -1.39 else -2.0) * m else (c + 2.0) * m
-            Situation.DOOR_REAR -> if (!sideIsDesignLeft) 1.34 * m else (c - 2.0) * m
-            Situation.PULL_OUT -> if (sideIsDesignLeft) (c - 3.5) * m else (c + 3.0) * m
-            else -> egoX + d * Road.LANE_WIDTH
+            Situation.DOOR -> if (sideIsDesignLeft) (if (kind.rider) -1.39 else c - 4.5) * m else (c + 2.0) * m
+            Situation.PULL_OUT -> if (sideIsDesignLeft) (if (kind.rider) c - 2.6 else c - 3.5) * m else (c + 3.0) * m
+            Situation.MERGE -> if (sideIsDesignLeft) (c - 3.5) * m else (c + 3.0) * m
+            else -> egoX + dir.sign * Road.LANE_WIDTH
         }
     }
+
+    /** The lane beyond the target lane (pull out / merge / door: the far lane; lane change: none). */
+    fun farLaneX(dir: Dir): Double? =
+        when (situation) {
+            Situation.PULL_OUT, Situation.MERGE -> (c - 7.0) * m
+            Situation.DOOR -> (c - 8.0) * m
+            else -> null
+        }
 }

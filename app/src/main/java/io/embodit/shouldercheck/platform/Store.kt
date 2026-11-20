@@ -6,7 +6,8 @@ import io.embodit.shouldercheck.domain.ProgressCodec
 
 /**
  * Local storage (design `persistence`): one SharedPreferences string through [ProgressCodec] (language, traffic side,
- * switches, volume, mute, demos seen, lessons passed, the last 300 question records). No account, no cloud.
+ * comfort mode, volume, mute, eye tracking asked, shoulder thresholds, best per level, unlock, today's run, last 50
+ * games). No account, no cloud. v0.1.x lesson progress is not carried over (decode starts fresh).
  */
 class Store(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -17,16 +18,8 @@ class Store(context: Context) {
         prefs.edit().putString(KEY, ProgressCodec.encode(p)).apply()
     }
 
-    /** The eye-tracking permission dialog is shown once, on the first S01 (later from S17 "去开启"). */
-    var eyeAsked: Boolean
-        get() = prefs.getBoolean(EYE_ASKED, false)
-        set(v) {
-            prefs.edit().putBoolean(EYE_ASKED, v).apply()
-        }
-
     companion object {
         private const val FILE = "shouldercheck"
         private const val KEY = "progress"
-        private const val EYE_ASKED = "eyeAsked"
     }
 }

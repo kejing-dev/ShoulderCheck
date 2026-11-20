@@ -124,9 +124,9 @@ internal fun WordButton(
     primary: Boolean = false,
     danger: Boolean = false,
     iconRes: Int? = null,
-    minWidth: Dp = 96.dp,
-    // 52 dp: the anti-aliased edge of a 48 dp capsule measured 45–46 dp in the HD emulator shot (ui-audit c)
-    height: Dp = 52.dp,
+    minWidth: Dp = 120.dp,
+    // B31 补: main buttons ≥ 64 dp high (光影渲染 / 私人影院 QA)
+    height: Dp = 64.dp,
 ) {
     Probe(name, onClick)
     val container =
@@ -163,7 +163,7 @@ internal fun LinkButton(name: String, text: String, onClick: () -> Unit, modifie
 /** Title row: title on the left, optional trailing buttons. */
 @Composable
 internal fun TitleRow(title: String, modifier: Modifier = Modifier, leading: (@Composable () -> Unit)? = null, trailing: @Composable () -> Unit = {}) {
-    Row(modifier = modifier.fillMaxWidth().heightIn(min = MinTouch), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(modifier = modifier.fillMaxWidth().heightIn(min = MinTouch), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         if (leading != null) leading()
         Text(text = title, style = PicoTheme.typography.headlineSmall, color = PicoTheme.colorScheme.labelPrimary, maxLines = 1, onTextLayout = fits("Common#168"), modifier = Modifier.weight(1f))
         trailing()

@@ -2,6 +2,8 @@ package io.embodit.shouldercheck
 
 import io.embodit.shouldercheck.domain.ActorKind
 import io.embodit.shouldercheck.domain.Angles
+import io.embodit.shouldercheck.domain.Cabin
+import io.embodit.shouldercheck.domain.HudLayout
 import io.embodit.shouldercheck.domain.Dir
 import io.embodit.shouldercheck.domain.GlbAlpha
 import io.embodit.shouldercheck.domain.Layout
@@ -21,111 +23,69 @@ import org.junit.Assert.fail
 import org.junit.Test
 import java.io.File
 
-/** Scene layout rules: four-direction seating (D9 / D10), panels fixed to the car, D20 sight cone, D25 as shipped. */
+/** Scene layout rules: 3D hotspots (D50 补), read-outs in view (D14), check lights, D25 as shipped, GLB opaque. */
 class LayoutTest {
-    /** The panel's front normal (+Z of its rotation) in the world. */
-    private fun normal(q: Quat) = q.rotate(Vec3(0.0, 0.0, 1.0))
-
+    /** Cabin parts have positive sizes in both traffic sides (left-hand traffic rebuilds x × m, never a negative scale). */
     @Test
-    fun fourDirectionSeatingFacesTheUser() {
-        // the user sits facing east, south, west, north (with a sloppy head pitch / roll); P1 / P2 must face them
-        for (yaw in listOf(90.0, 180.0, -90.0, 0.0)) {
-            for ((pitch, roll) in listOf(0.0 to 0.0, -30.0 to 0.0, 30.0 to 0.0, 10.0 to 20.0)) {
-                val head = Pose(Vec3(1.0, 1.3, -2.0), Quat.yawPitchRoll(yaw, pitch, roll))
-                val car = Placement.seatFrame(head)
-                for (side in TrafficSide.values()) {
-                    for (place in listOf(Layout.p1(Seat.DRIVER, side), Layout.p2(Seat.DRIVER, side), Layout.p1Tall(Seat.DRIVER, side))) {
-                        // exactly what CarScene writes: car root (seatFrame) x panel holder (place.rotation)
-                        val world = car.rotation * place.rotation
-                        val pos = Placement.toWorld(car, place.centre)
-                        val toUser = head.position - pos
-                        val n = normal(world)
-                        assertTrue("yaw=$yaw p=$pitch r=$roll side=$side", kotlin.math.abs(Angles.wrap(Angles.yawOf(n) - Angles.yawOf(toUser))) < 10.0)
-                        assertTrue("upright", Angles.between(world.rotate(Vec3.UP), Vec3.UP) < 1.0)
-                        assertEquals(0.0, world.rotate(Vec3.RIGHT).y, 1e-9)
-                        assertTrue(place.scale > 0)
-                    }
-                }
-            }
-        }
-    }
-
-    /** The runtime panel poses (Layout -> CarScene, no other rotation) obey the yaw-only placeUpright rule. */
-    @Test
-    fun runtimePanelPosesAreUprightBelowEyeInBand() {
+    fun cabinPartsArePositiveInBothTrafficSides() {
         for (side in TrafficSide.values()) {
-            for (place in listOf(Layout.p1(Seat.DRIVER, side), Layout.p2(Seat.DRIVER, side), Layout.p1Tall(Seat.DRIVER, side))) {
-                assertTrue(Angles.between(place.rotation.rotate(Vec3.UP), Vec3.UP) < 1.0)
-                val drop = -Angles.pitchOf(place.centre)
-                assertTrue("drop $drop", drop in 10.0..20.0)
-                assertTrue(place.centre.length in 0.8..1.2)
-                // the panel front (+Z) points back at the eye horizontally
-                assertEquals(0.0, Angles.wrap(Angles.yawOf(place.centre) + 180.0 - Angles.yawOf(normal(place.rotation))), 0.5)
-            }
-            // seat-back screen: upright, 16 deg below; 0.72 m is the design's own seat-back distance (D12 note)
-            for (place in listOf(Layout.p1(Seat.REAR, side), Layout.p2(Seat.REAR, side))) {
-                assertTrue(Angles.between(place.rotation.rotate(Vec3.UP), Vec3.UP) < 1e-6)
-                assertEquals(0.718, place.centre.length, 0.005)
-                assertTrue(-Angles.pitchOf(place.centre) in 10.0..20.0)
-            }
-            for (seat in Seat.values()) for (d in Dir.values()) {
-                val a = Layout.ang(seat, side, d)
-                assertTrue(Angles.between(a.rotation.rotate(Vec3.UP), Vec3.UP) < 1e-6)
-            }
+            val cab = Layout.cabin(Seat.DRIVER, side)
+            for (p in cab.parts + cab.doors.flatMap { it.parts }) assertTrue("${p.name} size", p.size.x > 0 && p.size.y > 0 && p.size.z > 0)
         }
     }
 
+    /**
+     * D50 补 (brief): every 3D clickable is ≥ 3° from the default seat and two clickables that are on at the same time are
+     * ≥ 2° apart (the 「走」 button, 「暂停」, the door handle in the door round; the two S54 buttons).
+     */
     @Test
-    fun panelsSitBelowEyeLevelAtDesignDistances() {
+    fun hotspotsAreBigAndApart() {
         for (side in TrafficSide.values()) {
-            val p1 = Layout.p1(Seat.DRIVER, side).centre
-            val p2 = Layout.p2(Seat.DRIVER, side).centre
-            assertEquals(1.05, p1.length, 1e-9)
-            assertEquals(-10.0, Angles.pitchOf(p1), 1e-6)
-            assertEquals(6.0 * side.m, Angles.yawOf(p1), 1e-6)
-            assertEquals(1.10, p2.length, 1e-9)
-            assertEquals(-15.0, Angles.pitchOf(p2), 1e-6)
-            // tall P1, upright: its lower edge stays above the dashboard line (-21.8 deg)
-            val tall = Layout.p1Tall(Seat.DRIVER, side).centre
-            val lowerY = tall.y - 600 * 0.0008 * 0.8 / 2
-            assertTrue(Math.toDegrees(kotlin.math.atan2(-lowerY, kotlin.math.hypot(tall.x, tall.z))) < 21.0)
-        }
-    }
-
-    @Test
-    fun noCabinPartInTheDefaultSightConesAndNoNegativeScale() {
-        for (side in TrafficSide.values()) {
-            for (seat in Seat.values()) {
-                val cab = Layout.cabin(seat, side)
-                for (p in cab.parts + cab.doors.flatMap { it.parts }) {
-                    assertTrue("${p.name} size", p.size.x > 0 && p.size.y > 0 && p.size.z > 0)
-                }
-                if (seat != Seat.DRIVER) continue
-                // P1 800 × 520 dp, P2 760 × 176 dp, tall P1 800 × 600 dp (0.8 mm per dp at scale 1)
-                for ((place, dims) in listOf(Layout.p1(seat, side) to (800 to 520), Layout.p2(seat, side) to (760 to 176), Layout.p1Tall(seat, side) to (800 to 600))) {
-                    val rot = place.rotation
-                    for (p in cab.parts) {
-                        if (p.name == "hood" || p.name.startsWith("fender")) continue
-                        assertTrue("${p.name} in cone ($side ${dims.first}x${dims.second})", !Layout.inSightCone(p, Vec3.ZERO, place.centre, rot, dims.first * 0.0008 * place.scale, dims.second * 0.0008 * place.scale))
-                    }
-                }
+            val cabin = Cabin(Seat.DRIVER, side)
+            val spots = HudLayout.hotspots(cabin, Layout.cabin(Seat.DRIVER, side))
+            assertEquals(3, spots.size)
+            for (h in spots) assertTrue("${h.target} ${HudLayout.visualAngle(h)}° ≥ 3°", HudLayout.visualAngle(h) >= 3.0)
+            for (i in spots.indices) for (j in i + 1 until spots.size) {
+                val g = HudLayout.gap(spots[i], spots[j])
+                assertTrue("${spots[i].target}–${spots[j].target} gap $g° ≥ 2°", g >= 2.0)
             }
+            val ask = HudLayout.askHotspots(side)
+            for (h in ask) assertTrue(HudLayout.visualAngle(h) >= 3.0)
+            assertTrue(HudLayout.gap(ask[0], ask[1]) >= 2.0)
+            // design numbers: 「走」 10.4° × 5.2° at 0.77 m (collider 13.3° × 7.4°), 「暂停」 5.7°+
+            assertEquals(0.77, HudLayout.GO.length, 0.01)
+            assertTrue(HudLayout.visualAngle(spots.first { it.target == io.embodit.shouldercheck.domain.Target.PAUSE }) >= 5.7)
         }
-        // a box right on the line of sight is detected
-        val blocker = io.embodit.shouldercheck.domain.Part("blocker", Vec3(0.0, -0.1, -0.5), Vec3(0.2, 0.2, 0.05), mat = io.embodit.shouldercheck.domain.PartMat.TRIM)
-        val p1 = Layout.p1(Seat.DRIVER, TrafficSide.RIGHT_HAND)
-        assertTrue(Layout.inSightCone(blocker, Vec3.ZERO, p1.centre, p1.rotation, 0.64, 0.33))
     }
 
+    /** D14 / B19: read-outs sit below the eye line and within 40° below it; the card shrinks out of the way of the road. */
     @Test
-    fun angReadoutsSitOnTheirSideFacingYou() {
-        for (side in TrafficSide.values()) for (seat in Seat.values()) {
-            for (d in Dir.values()) {
-                val a = Layout.ang(seat, side, d)
-                assertEquals(d.sign.toDouble(), Math.signum(a.centre.x), 0.0)
-                assertEquals(95.0, kotlin.math.abs(Angles.yawOf(a.centre)), 0.5)
-                // angular size equals the design's 0.6 at 0.55 m
-                assertEquals(0.6 / 0.55, a.scale / a.centre.length, 1e-9)
+    fun readoutsBelowEyeAndInView() {
+        for (p in listOf(HudLayout.GO, HudLayout.PAUSE, HudLayout.CARD_SMALL, HudLayout.COMBO, HudLayout.MINIMAP, HudLayout.MERGE_BAR)) {
+            val drop = -Angles.pitchOf(p)
+            assertTrue("$p drop $drop", drop in 0.0..40.0)
+            assertTrue("$p yaw", kotlin.math.abs(Angles.yawOf(p)) < 35.0)
+        }
+        // the shrunk card leaves the road ahead free: ≥ 8° below the horizon, the big card is above the hood
+        assertTrue(-Angles.pitchOf(HudLayout.CARD_SMALL) >= 8.0)
+        assertTrue(-Angles.pitchOf(HudLayout.CARD_BIG) < 5.0)
+        // 3D letters ≥ 0.5° (D13): small card 128 px tall line at 60 % of 0.0233 m, 0.78 m away
+        val letter = 0.6 * (io.embodit.shouldercheck.scene.Hud3D.CARD_SMALL_W / 6)
+        assertTrue(Math.toDegrees(2 * kotlin.math.atan(letter / 2 / HudLayout.CARD_SMALL.length)) >= 0.5)
+    }
+
+    /** The check lights sit next to the target-side mirror without covering it, both sides, both traffic sides. */
+    @Test
+    fun checkLightsBesideTheMirror() {
+        for (side in TrafficSide.values()) {
+            val cabin = Cabin(Seat.DRIVER, side)
+            for (dir in Dir.values()) {
+                val m = cabin.mirror(io.embodit.shouldercheck.domain.MirrorId.side(dir))!!
+                val c = HudLayout.chips(cabin, dir)
+                val off = Angles.between(c, m.pos)
+                assertTrue("$side $dir chips $off° from the mirror", off in 3.0..12.0)
+                assertTrue("between you and the mirror", kotlin.math.abs(c.x) <= kotlin.math.abs(m.pos.x) && c.length < m.pos.length)
+                assertTrue(c.length >= 0.55)
             }
         }
     }
@@ -137,7 +97,7 @@ class LayoutTest {
         val root = MiniJson.parse(text) as Map<*, *>
         val all = ModelCalibration.parseAll(text)
         for (kind in ActorKind.values()) {
-            val role = kind.model ?: continue
+            val role = kind.model
             val entry = root[role] as Map<*, *>
             val c = all.getValue(role).withScale(entry.num("scaleBalanced")!!)
             val f = ModelCalibration.axisVector(entry["forwardAxis"] as String)!!
@@ -182,7 +142,7 @@ class LayoutTest {
     @Test
     fun shippedGlbsAreOpaque() {
         val dir = listOf(File("src/main/assets/models"), File("app/src/main/assets/models")).firstOrNull { it.isDirectory } ?: return fail("models folder not found")
-        for (role in listOf("sedan", "suv", "ebike", "bike", "moto")) {
+        for (role in listOf("sedan", "suv", "ebike", "bike", "moto", "tree")) {
             val (_, report) = GlbAlpha.forceOpaque(File(dir, "$role.glb").readBytes())
             assertTrue("$role has materials", report.modes.isNotEmpty())
             assertTrue("$role ${report.modes}", report.allOpaque)

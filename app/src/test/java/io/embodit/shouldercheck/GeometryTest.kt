@@ -8,12 +8,8 @@ import io.embodit.shouldercheck.domain.BlindSpot
 import io.embodit.shouldercheck.domain.Box
 import io.embodit.shouldercheck.domain.Cabin
 import io.embodit.shouldercheck.domain.Dir
-import io.embodit.shouldercheck.domain.DoorModel
-import io.embodit.shouldercheck.domain.GhostRoute
 import io.embodit.shouldercheck.domain.Hand
-import io.embodit.shouldercheck.domain.HazardSpec
 import io.embodit.shouldercheck.domain.Key
-import io.embodit.shouldercheck.domain.LaneChangeModel
 import io.embodit.shouldercheck.domain.MirrorAims
 import io.embodit.shouldercheck.domain.MirrorId
 import io.embodit.shouldercheck.domain.MirrorModel
@@ -22,7 +18,6 @@ import io.embodit.shouldercheck.domain.Pose
 import io.embodit.shouldercheck.domain.Quat
 import io.embodit.shouldercheck.domain.Road
 import io.embodit.shouldercheck.domain.RoadLayout
-import io.embodit.shouldercheck.domain.Scenes
 import io.embodit.shouldercheck.domain.Seat
 import io.embodit.shouldercheck.domain.Situation
 import io.embodit.shouldercheck.domain.TrafficSide
@@ -35,7 +30,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Cabin / mirror / door / lane-change geometry: U11, U12, D9 placeUpright, design numbers. */
+/** Cabin / mirror geometry: blind spot (U12), D9 placeUpright, design numbers (v0.1 cabin kept in v0.2.0). */
 class GeometryTest {
     private val driver = Cabin(Seat.DRIVER, TrafficSide.RIGHT_HAND)
     private val rear = Cabin(Seat.REAR, TrafficSide.RIGHT_HAND)
@@ -145,79 +140,6 @@ class GeometryTest {
         val roadFar = MirrorModel.project(Vec3(-3.13, Road.ROAD_Y, 30.0), left, Vec3.ZERO, 5.0)!!
         assertTrue(roadFar.v < 0.5)
         assertNull(MirrorModel.project(Vec3(-3.0, 0.0, -10.0), left, Vec3.ZERO, 5.0)) // ahead: not in a mirror
-    }
-
-    @Test
-    fun u11_laneChangePredictiveConflict() {
-        val s = Scenes.build(Situation.LANE_LEFT, TrafficSide.RIGHT_HAND)
-        val slot = s.slot!!
-        val len = ActorKind.SEDAN.length
-        // 12 m back, closing at +6 m/s → inside the slot within 3 s
-        val fast = Scenes.hazardActor("a", HazardSpec(ActorKind.SEDAN, Dir.LEFT, 12.0 + len, 6.0), s.road)
-        assertNotNull(LaneChangeModel.predictConflict(fast, 0.0, slot))
-        // 6 m back, falling behind at −2 m/s → never
-        val slow = Scenes.hazardActor("b", HazardSpec(ActorKind.SEDAN, Dir.LEFT, 6.0 + len, -2.0), s.road)
-        assertNull(LaneChangeModel.predictConflict(slow, 0.0, slot))
-        // a car in the other lane never conflicts with a change to the left
-        val other = Scenes.hazardActor("c", HazardSpec(ActorKind.SEDAN, Dir.RIGHT, 3.0, 0.0), s.road)
-        assertNull(LaneChangeModel.predictConflict(other, 0.0, slot))
-        // slot = your place in the target lane ± 2 m
-        assertEquals(s.cabin.egoFrontZ - 2.0, slot.zMin, 1e-9)
-        assertEquals(s.cabin.egoRearZ + 2.0, slot.zMax, 1e-9)
-    }
-
-    @Test
-    fun ghostCarNeverSweepsYourHead() {
-        for (sit in listOf(Situation.LANE_LEFT, Situation.LANE_RIGHT, Situation.PULL_OUT, Situation.RIGHT_TURN)) {
-            for (side in TrafficSide.values()) {
-                val r = RoadLayout(sit, side)
-                var t = 0.0
-                while (t <= 3.0) {
-                    val g = GhostRoute.pose(sit, side, r, t)
-                    val b = Box(g.position, ActorKind.SEDAN.length, ActorKind.SEDAN.width, ActorKind.SEDAN.height, g.headingDeg)
-                    assertTrue(b.samplePoints().all { it.distanceTo(Vec3.ZERO) > 1.5 })
-                    t += 0.1
-                }
-                val end = GhostRoute.pose(sit, side, r, 3.0)
-                if (sit != Situation.RIGHT_TURN) assertEquals(r.hazardX(ActorKind.SEDAN, sit.dir(side)), end.position.x, 1e-6)
-                else assertEquals(sit.dir(side).sign * 90.0, end.headingDeg, 1e-6)
-            }
-        }
-    }
-
-    @Test
-    fun doorModelAngles() {
-        val d = DoorModel(driver)
-        d.update(0.1, Hand.RIGHT, 0.0)
-        assertEquals(0.0, d.angle, 1e-9) // holding alone does not move the door
-        repeat(30) { d.update(1.0 / 72, Hand.RIGHT, 0.03) }
-        assertEquals(8.0, d.angle, 1e-9)
-        assertFalse(d.executed)
-        var t = 0.0
-        while (d.angle < 59.99 && t < 2.0) {
-            d.update(1.0 / 72, Hand.RIGHT, 0.10)
-            t += 1.0 / 72
-        }
-        assertEquals(0.5, t, 0.05) // 8° → 60° in 0.5 s
-        assertTrue(d.executed)
-        assertEquals(1.0, d.edgeOut(), 0.01)
-        // release mid-swing: stays
-        val d2 = DoorModel(driver)
-        repeat(20) { d2.update(1.0 / 72, Hand.LEFT, 0.10) }
-        val a = d2.angle
-        repeat(20) { d2.update(1.0 / 72, null, 0.0) }
-        assertEquals(a, d2.angle, 1e-9)
-        assertEquals(Hand.LEFT, d2.lastGrabHand)
-        d2.close()
-        assertEquals(0.0, d2.angle, 1e-9)
-        // reach sphere and push along the outward normal (−X for the driver's door)
-        assertTrue(DoorModel.inReach(driver, driver.doorHandle + Vec3(0.05, 0.05, 0.05)))
-        assertFalse(DoorModel.inReach(driver, driver.doorHandle + Vec3(0.2, 0.0, 0.0)))
-        assertEquals(0.10, DoorModel.pushDistance(driver.doorHandle, driver.doorHandle + Vec3(-0.10, 0.0, 0.0), driver.doorNormal), 1e-9)
-        assertEquals(Dir.LEFT, driver.doorSide)
-        assertEquals(Hand.RIGHT, driver.farHand)
-        assertEquals(Hand.LEFT, rear.farHand)
-        assertEquals(Hand.LEFT, Cabin(Seat.DRIVER, TrafficSide.LEFT_HAND).farHand)
     }
 
     @Test

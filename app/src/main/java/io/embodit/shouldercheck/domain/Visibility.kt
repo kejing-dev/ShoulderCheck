@@ -57,9 +57,4 @@ object Visibility {
         }
         return false
     }
-
-    /** What the user can reach with head + eyes for a turn range: band or (driver) any mirror. */
-    fun reachable(box: Box, cabin: Cabin, range: TurnRange, aims: MirrorAims): Boolean =
-        inBand(box, cabin, -(range.maxLeft + JUDGE_HALF_FOV), range.maxRight + JUDGE_HALF_FOV) ||
-            MirrorModel.anyMirrorSees(box, cabin, aims) != null
 }

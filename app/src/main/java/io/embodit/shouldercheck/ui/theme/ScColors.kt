@@ -38,8 +38,18 @@ object ScColors {
     val SkyLow = Color(0xFFBFD9EE) // design-style: fixed-figma-color street.sky
     val SkyHigh = Color(0xFFEAF3FA) // design-style: fixed-figma-color street.sky
 
-    // ---- scene / panel extras
-    val Bus = Color(0xFF2F7D5B) // design-style: fixed-figma-color bus body (procedural, lesson 5 context)
+    // ---- dusk (level 4) and the 3D HUD
+    val DuskLow = Color(0xFFE59A6A) // design-style: fixed-figma-color dusk horizon (level 4)
+    val DuskHigh = Color(0xFF243A63) // design-style: fixed-figma-color dusk zenith (level 4)
+    val Go = Color(0xFF2FBF71) // design-style: fixed-figma-color 「走」 lit text (green on the dark capsule 6.4:1)
+    val GoBody = Color(0xFF22262B) // design-style: fixed-figma-color 「走」 capsule body (dark grey)
+    val GoIdle = Color(0xFF9AA1A9) // design-style: fixed-figma-color 「走」 not ready (grey text 5.8:1 on the body)
+    val TimerLate = Color(0xFFF08A24) // design-style: fixed-figma-color timer ring last 30 % (orange)
+    val ChipOn = Color(0xFF1E6E40) // design-style: fixed-figma-color 「镜」「回头」 lit (white text 6.3:1)
+    val MissLight = Color(0xFFFF7052) // design-style: fixed-figma-color 「险情」 word on the dark pop (4.8:1)
+    val ComboHot = Color(0xFF6EE7A0) // design-style: fixed-figma-color combo ≥ 3 on the translucent label (4.8:1 over the sky)
+    val Hazard = Color(0xFFFF8A1F) // design-style: fixed-figma-color replay highlight (orange)
+    val StreetLight = Color(0xFFFFD9A0) // design-style: fixed-figma-color street lamp glow (dusk)
     val IconDisc = Color(0xFF1C1E21) // design-style: fixed-figma-color dark disc behind status icons (amber 7.9:1, green 3.9:1, red 4.0:1, grey 5.2:1; a white disc gave amber 2.2:1)
     val Ink = Color(0xFF000000) // design-style: fixed-figma-color text on the interaction-blue primary button (5.2:1; #14181C was 4.46:1)
 }

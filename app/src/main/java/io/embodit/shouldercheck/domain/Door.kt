@@ -7,113 +7,53 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * Door model (design `model.doorModel`): grip inside the handle's reach sphere = hold (the door does not move; the
- * holding controller is the opening hand); then push the hand out along the door's outward normal: 3 cm → the door
- * cracks open (0° → 8°, edge ~0.16 m out), 10 cm → it swings open (8° → 60° over 0.5 s, edge ~1.0 m out). Releasing
- * the grip stops the door at its current angle; [close] (B key / P2 "关门") resets it. "Execute" = the angle crossing
- * 12° (edge into the passing band 0.25 m outside the body).
+ * Door model v0.2.0 (design `model.doorModel`, profile D50 — user on the headset 2026-11-17: 「现在门 push 不了」):
+ * ONE tap on the inner handle (controller ray + trigger, hand ray + pinch, eye-hand gaze + pinch, a poke, the 「开门」
+ * button or the A key) swings the door open by itself: 0° → [OPEN_DEG] in [OPEN_TIME] s, ease-in-out. There is no grip,
+ * no push distance, no far-hand rule. On a close call the door stops at [STOP_DEG] (the cyclist is braking hard).
  *
- * v0.1.1 (profile D50): [tap] — one tap with the controller ray, the hand ray or eye-hand — opens it fully by itself
- * (8° in 0.15 s, then 60° in 0.5 s), no push needed; the grip + push path stays for hands that reach the handle.
- *
- * Angles in degrees, push in metres (outward displacement of the hand since the grab, see [pushDistance]).
+ * Time-based and pure: [angleAt] is a function of the time since the tap, so the conflict judge, the replay and the
+ * scene all read the same curve. Angles in degrees.
  */
-class DoorModel(val cabin: Cabin) {
-    var angle = 0.0
-        private set
-    private var target = 0.0
+object DoorModel {
+    const val OPEN_DEG = 35.0
+    const val OPEN_TIME = 1.0
+    const val STOP_DEG = 12.0
 
-    /** The hand holding the handle now, or null. */
-    var holder: Hand? = null
-        private set
+    /** After the door is open the judge keeps watching the swept zone this long (a rider that arrives a beat later). */
+    const val WATCH_TIME = 1.0
+    const val MARGIN = 0.3
 
-    /** The hand that last grabbed the handle (stays after release, for the far-hand step). */
-    var lastGrabHand: Hand? = null
-        private set
-
-    /** A tap swung the door: it keeps opening to [OPEN_DEG] after the hand is gone, until [close]. */
-    var tapped = false
-        private set
-
-    /** One tap by [hand] (D50): the door opens all the way on its own; [hand] counts as the opening hand. */
-    fun tap(hand: Hand) {
-        lastGrabHand = hand
-        tapped = true
-        target = OPEN_DEG
+    /** Door angle [sinceTap] s after the tap (null = not tapped): ease-in-out to 35°, held; [stopAt] caps it (close call). */
+    fun angleAt(sinceTap: Double?, stopAt: Double? = null): Double {
+        val s = sinceTap ?: return 0.0
+        if (s <= 0.0) return 0.0
+        val u = (s / OPEN_TIME).coerceIn(0.0, 1.0)
+        val a = OPEN_DEG * (u * u * (3 - 2 * u))
+        return if (stopAt != null) minOf(a, stopAt) else a
     }
 
-    /** Time-free update: [dt] s since the last call, [holding] the hand gripping inside the reach sphere, [push] outward m. */
-    fun update(dt: Double, holding: Hand?, push: Double): Double {
-        if (holding != null && holder == null) lastGrabHand = holding
-        holder = holding
-        if (tapped) {
-            target = OPEN_DEG
-        } else if (holding == null) {
-            target = angle // released: stays where it is
-        } else {
-            val wanted = if (push >= OPEN_PUSH) OPEN_DEG else if (push >= CRACK_PUSH) CRACK_DEG else 0.0
-            target = max(target, wanted).coerceAtMost(OPEN_DEG)
+    /** Outward reach of the door edge beyond the body side at [deg] (m): 35° → 0.66 m. */
+    fun edgeOut(cabin: Cabin, deg: Double): Double = cabin.doorLength * sin(Math.toRadians(deg))
+
+    /** Plan-view polygon swept by the door from closed to [deg] (hinge, then arc points). */
+    fun sweep(cabin: Cabin, deg: Double): List<Vec2> {
+        val h = Vec2(cabin.doorHinge.x, cabin.doorHinge.z)
+        val out = cabin.doorSide.sign.toDouble()
+        val pts = ArrayList<Vec2>()
+        pts += h
+        val steps = max(1, (deg / 7.5).toInt() + 1)
+        for (i in 0..steps) {
+            val a = Math.toRadians(deg * i / steps)
+            pts += Vec2(h.x + out * cabin.doorLength * sin(a), h.z + cabin.doorLength * cos(a))
         }
-        if (angle < target) {
-            val rate = if (angle < CRACK_DEG) CRACK_DEG / CRACK_TIME else (OPEN_DEG - CRACK_DEG) / OPEN_TIME
-            angle = min(target, angle + rate * dt)
-        }
-        return angle
+        return pts
     }
 
-    fun close() {
-        angle = 0.0
-        target = 0.0
-        tapped = false
-    }
-
-    /** Outward reach of the door edge beyond the body side at [deg] (m): 8° → 0.16, 60° → 1.0. */
-    fun edgeOut(deg: Double = angle): Double = cabin.doorLength * sin(Math.toRadians(deg))
-
-    val executed: Boolean
-        get() = angle > EXECUTE_DEG
-
-    companion object {
-        const val CRACK_PUSH = 0.03
-        const val OPEN_PUSH = 0.10
-        const val CRACK_DEG = 8.0
-        const val OPEN_DEG = 60.0
-        const val CRACK_TIME = 0.15
-        const val OPEN_TIME = 0.5
-        const val EXECUTE_DEG = 12.0
-        const val MARGIN = 0.3
-
-        /** Hand displacement since the grab along the outward normal (m; negative = pulled in). */
-        fun pushDistance(grabPoint: Vec3, hand: Vec3, outwardNormal: Vec3): Double = (hand - grabPoint).dot(outwardNormal)
-
-        /** True when [hand] is inside the handle's reach sphere. */
-        fun inReach(cabin: Cabin, hand: Vec3, radius: Double = cabin.handleReach): Boolean = hand.distanceTo(cabin.doorHandle) <= radius
-
-        /** Plan-view polygon swept by the door from closed to [deg] (hinge, then arc points). */
-        fun sweep(cabin: Cabin, deg: Double): List<Vec2> {
-            val h = Vec2(cabin.doorHinge.x, cabin.doorHinge.z)
-            val out = cabin.doorSide.sign.toDouble()
-            val pts = ArrayList<Vec2>()
-            pts += h
-            val steps = max(1, (deg / 7.5).toInt() + 1)
-            for (i in 0..steps) {
-                val a = Math.toRadians(deg * i / steps)
-                pts += Vec2(h.x + out * cabin.doorLength * sin(a), h.z + cabin.doorLength * cos(a))
-            }
-            return pts
-        }
-
-        /**
-         * Door conflict (design `doorModel.conflict`): while the door is past 12°, any road user's footprint within
-         * [MARGIN] of the swept sector. A crack (≤ 8°) never conflicts.
-         */
-        fun conflicts(cabin: Cabin, deg: Double, box: Box): Boolean {
-            if (deg <= EXECUTE_DEG) return false
-            return Geometry2D.distance(sweep(cabin, deg), box.footprint()) < MARGIN
-        }
-
-        /** Conflict zone used by the generator: the full-open sweep (60°) plus the margin. */
-        fun inOpenZone(cabin: Cabin, box: Box): Boolean = Geometry2D.distance(sweep(cabin, OPEN_DEG), box.footprint()) < MARGIN
+    /** True when a road user's footprint is within [MARGIN] of the sector swept by the door at [deg]. */
+    fun conflicts(cabin: Cabin, deg: Double, box: Box): Boolean {
+        if (deg <= 1.0) return false
+        return Geometry2D.distance(sweep(cabin, deg), box.footprint()) < MARGIN
     }
 }
 

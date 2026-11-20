@@ -60,9 +60,12 @@ internal object MirrorFrames {
         actors: List<Pair<Actor, Box>>,
         highlight: String?,
         hood: Color,
+        /** Your car's sideways move (the road shifts by −dx in the car frame) and the dash scroll (0 … 9 m). */
+        dx: Double = 0.0,
+        dashShift: Double = 0.0,
     ): MirrorFrame {
         fun p(x: Double, y: Double, z: Double): Pair<Float, Float>? {
-            val h = MirrorModel.projectRaw(Vec3(x, y, z), mirror, eye, aim) ?: return null
+            val h = MirrorModel.projectRaw(Vec3(x - dx, y, z), mirror, eye, aim) ?: return null
             return h.u.toFloat().coerceIn(-6f, 7f) to h.v.toFloat().coerceIn(-6f, 7f)
         }
         val horizon = MirrorModel.projectRaw(eye + MirrorModel.aimDirection(mirror, aim) * 5000.0, mirror, eye, aim)?.v?.toFloat() ?: 0.5f
@@ -109,7 +112,7 @@ internal object MirrorFrames {
         val lw = 0.075
         for (x in road.solidLines) strip(ScColors.LaneLine, x - lw, x + lw, y + 0.005)
         for (x in road.dashedLines) {
-            var z = -1.5
+            var z = -1.5 - 9.0 + dashShift
             while (z < 120.0) {
                 strip(ScColors.LaneLine, x - lw, x + lw, y + 0.005, doubleArrayOf(z, z + 3.0))
                 z += 9.0
@@ -138,8 +141,7 @@ internal object MirrorFrames {
         // road users: pre-rendered front silhouettes (followers face you), far to near
         val sprites = ArrayList<MSprite>()
         for ((a, box) in actors) {
-            if (a.role == ActorRole.DECOR) continue
-            val role = a.kind.model ?: continue
+            val role = a.kind.model
             if (!MirrorModel.sees(box, mirror, cabin, aim, eye)) continue
             val bottom = MirrorModel.projectRaw(box.centre, mirror, eye, aim) ?: continue
             val topHit = MirrorModel.projectRaw(box.centre + Vec3(0.0, box.height, 0.0), mirror, eye, aim) ?: continue

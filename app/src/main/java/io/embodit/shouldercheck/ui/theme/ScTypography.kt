@@ -26,6 +26,17 @@ import io.embodit.shouldercheck.R
  */
 private val Weights = intArrayOf(400, 500, 600, 700)
 
+/**
+ * The same Noto Sans → Noto Sans SC → system fallback chain as a platform [Typeface] of one [weight], for the 3D labels
+ * drawn on Canvas bitmaps (scene/TextTex.kt). Null when the fonts cannot be built (the caller falls back to bold).
+ */
+fun scTypeface(resources: Resources, weight: Int): Typeface? =
+    runCatching {
+        val latin = PlatformFontFamily.Builder(PlatformFont.Builder(resources, if (weight >= 600) R.font.noto_sans_bold else R.font.noto_sans_medium).setWeight(weight).build()).build()
+        val chinese = PlatformFontFamily.Builder(PlatformFont.Builder(resources, R.font.noto_sans_sc_subset).setFontVariationSettings("'wght' $weight").setWeight(weight).build()).build()
+        Typeface.CustomFallbackBuilder(latin).addCustomFallback(chinese).setSystemFallback("sans-serif").setStyle(android.graphics.fonts.FontStyle(weight, android.graphics.fonts.FontStyle.FONT_SLANT_UPRIGHT)).build()
+    }.getOrNull()
+
 private fun buildFontFamily(resources: Resources): FontFamily =
     try {
         fun latin(id: Int, weight: Int): PlatformFont = PlatformFont.Builder(resources, id).setWeight(weight).build()
@@ -86,26 +97,4 @@ internal fun Typography.withFamily(family: FontFamily): Typography {
         titleMedium = titleMedium.inFamily(),
         titleSmall = titleSmall.inFamily(),
     )
-}
-
-
-/**
- * Type roles of the design (`typography`): task line = bodyLarge, step chip = labelLarge (18 dp on P2 at 1.10 m),
- * result title = headlineMedium, metric = displaySmall with tabular digits, B-pillar angle readout 32 dp.
- */
-object ScType {
-    val taskLine: TextStyle
-        @Composable get() = PicoTheme.typography.bodyLarge
-
-    val stepChip: TextStyle
-        @Composable get() = PicoTheme.typography.labelLarge.copy(fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
-
-    val resultTitle: TextStyle
-        @Composable get() = PicoTheme.typography.headlineMedium
-
-    val metric: TextStyle
-        @Composable get() = PicoTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum, lnum")
-
-    val pillarAngle: TextStyle
-        @Composable get() = PicoTheme.typography.displaySmall.copy(fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum, lnum")
 }

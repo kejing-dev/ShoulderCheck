@@ -110,67 +110,6 @@ object Layout {
         return Quat.axisAngle(Vec3.UP, yaw) * Quat.axisAngle(Vec3.RIGHT, -pitch)
     }
 
-    // ------------------------------------------------------------------------------------------------- panels
-
-    /**
-     * P1 centre screen (design panels[P1].placement): driver 1.05 m, yaw +6°, 10° below the eye line, upright; rear:
-     * the seat-back screen (design: face at z −0.69, 0.72 m, 16° below — D12 note: nearer than the 0.8 m band because
-     * the seat-back screen is where it is).
-     */
-    fun p1(seat: Seat, side: TrafficSide): PanelPlace =
-        if (seat == Seat.DRIVER) PanelPlace.upright(6.0 * side.m, 1.05, 10.0, 0.8) else PanelPlace.upright(0.0, REAR_DIST, REAR_DROP, 0.6)
-
-    /** The 800 × 600 dp P1 (result card, scorecard): same place as P1 (upright, lower edge at −19.9°, above the dash −21.8°). */
-    fun p1Tall(seat: Seat, side: TrafficSide): PanelPlace = p1(seat, side)
-
-    /** P2 HUD strip: driver 1.10 m, yaw 0, 15° below, upright; rear: the same seat-back screen as P1. */
-    fun p2(seat: Seat, side: TrafficSide): PanelPlace =
-        if (seat == Seat.DRIVER) PanelPlace.upright(0.0, 1.10, 15.0, 0.8) else PanelPlace.upright(0.0, REAR_DIST, REAR_DROP, 0.6)
-
-    /** Seat-back screen centre (design z −0.69, y −0.20 → 0.718 m, 16.2° below the eye). */
-    val REAR_SCREEN = Vec3(0.0, -0.20, -0.69)
-    private val REAR_DIST = REAR_SCREEN.length
-    private val REAR_DROP = -Angles.pitchOf(REAR_SCREEN)
-
-    /**
-     * B-pillar turn readouts (design panels[ANG]: yaw ≈ ±95°, 200 × 80 dp, scale 0.6 at 0.55 m). DEVIATION: placed on
-     * the inner trim plane just forward of each B pillar (the 0.55 m point is outside the left trim and mid-air on the
-     * right), scale grown with the distance so the angular size equals the design's 0.6 at 0.55 m.
-     */
-    fun ang(seat: Seat, side: TrafficSide, dir: Dir): PanelPlace {
-        val cabin = Cabin(seat, side)
-        val x = if (dir == Dir.LEFT) cabin.innerLeft + 0.02 else cabin.innerRight - 0.02
-        val z = abs(x) * tan(Math.toRadians(5.0))
-        val p = Vec3(x, -0.06, z)
-        // upright, turned to the eye about the vertical axis only (same rule as placeUpright)
-        return PanelPlace(p, 0.6 * p.length / 0.55, Quat.yaw(Angles.yawOf(p)))
-    }
-
-    // ------------------------------------------------------------------------------------------------- guides
-
-    /** Where the guide ring shows for a step (demo S04, hints in S06), car frame of [cabin]'s seat. */
-    fun guideTarget(step: Step, cabin: Cabin): Vec3? {
-        fun toward(p: Vec3, by: Double) = p + (cabin.eye - p).normalized() * by
-        return when (step) {
-            Step.INNER_MIRROR, Step.LEFT_MIRROR, Step.RIGHT_MIRROR, Step.CONFIRM_LEFT, Step.CONFIRM_RIGHT -> {
-                val id = step.mirrorId ?: MirrorId.side(step.dir!!)
-                cabin.mirror(id)?.let { toward(it.pos, 0.03) }
-            }
-            Step.SHOULDER_LEFT, Step.SHOULDER_RIGHT, Step.SEE_HAZARD -> blindSpotWindow(cabin, step.dir ?: Dir.LEFT.physical(cabin.side))
-            Step.SIGNAL_LEFT, Step.SIGNAL_RIGHT -> cabin.stalk?.let { it + Vec3(0.0, 0.03, 0.0) }
-            Step.FAR_HAND -> cabin.doorHandle + Vec3(0.0, 0.04, 0.0)
-        }
-    }
-
-    /** Centre of the blind-spot window on [dir]: the side window at azimuth ±125° (driver) / ±115° (rear), 5° below eye level. */
-    fun blindSpotWindow(cabin: Cabin, dir: Dir): Vec3 {
-        val yaw = dir.sign * (if (cabin.seat == Seat.DRIVER) 125.0 else 115.0)
-        val d = Angles.dir(yaw, -5.0)
-        val plane = if (dir == Dir.LEFT) cabin.innerLeft + 0.03 else cabin.innerRight - 0.03
-        val t = plane / d.x
-        return d * min(t, 1.2)
-    }
-
     // ------------------------------------------------------------------------------------------------- cabin
 
     fun cabin(seat: Seat, side: TrafficSide): CabinLayout = if (seat == Seat.DRIVER) driver(side) else rear(side)

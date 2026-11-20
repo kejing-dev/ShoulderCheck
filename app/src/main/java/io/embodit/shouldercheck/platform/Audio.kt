@@ -5,12 +5,14 @@ import android.media.AudioAttributes
 import android.media.SoundPool
 import android.os.Handler
 import android.os.Looper
+import kotlin.math.pow
+import kotlin.random.Random
 
 /**
- * Sounds (design `audio`): native SoundPool, all files pre-rendered by tools/make_audio.py (peaks within −1 dBFS, cues
- * RMS −18 … −22, bed −30; B20). Master volume = the 低 / 中 / 高 setting × mute. The turn signal ticks at 1.5 Hz while
- * it is on; the engine / road bed loops quietly during practice; the near-miss cues are panned to the hazard's side.
- * There is no warning sound before a hazard (an e-bike is nearly silent: that is the lesson).
+ * Sounds (design `audio`): SoundPool, event sounds only — no engine / road / wind bed (B24). Sources are listed in the
+ * factory's apps/shoulder-check/build/sound-sources.md (CC0 recordings; the near-miss alert is a UI cue). Master volume
+ * = 低 / 中 / 高 × mute. One instance per event at a time (a new one stops the last, D51); real-world sounds get ±5 %
+ * pitch; the 「叮」 of a clear round rises a whole tone per combo step (max 5).
  *
  * Main thread only. [release] frees the pool (exit, D26).
  */
@@ -20,10 +22,9 @@ class Audio(context: Context) {
     private val pool = SoundPool.Builder().setMaxStreams(8).setAudioAttributes(attributes).build()
     private val ids = HashMap<String, Int>()
     private val loaded = HashSet<Int>()
+    private val streams = HashMap<String, Int>()
     private val main = Handler(Looper.getMainLooper())
     private var gain = 0.9f
-    private var bedStream = 0
-    private var bedWanted = false
     private var indicatorOn = false
     private var released = false
 
@@ -31,7 +32,6 @@ class Audio(context: Context) {
         pool.setOnLoadCompleteListener { _, id, status ->
             if (status == 0) loaded += id
             if (loaded.size == ids.size) ScLog.i("AUDIO loaded ${loaded.size}/${ids.size}")
-            if (bedWanted && bedStream == 0 && id == ids[BED]) startBed()
         }
         for (name in NAMES) {
             runCatching { app.assets.openFd("audio/$name.wav").use { fd -> ids[name] = pool.load(fd, 1) } }.onFailure { ScLog.e("AUDIO load $name failed: $it") }
@@ -41,26 +41,9 @@ class Audio(context: Context) {
     /** Effective master gain (0 = muted). */
     fun setGain(g: Float) {
         gain = g.coerceIn(0f, 1f)
-        if (bedStream != 0) pool.setVolume(bedStream, gain * BED_GAIN, gain * BED_GAIN)
     }
 
-    /** Engine idle / road bed on or off (practice states). */
-    fun bed(on: Boolean) {
-        bedWanted = on
-        if (on && bedStream == 0) startBed()
-        if (!on && bedStream != 0) {
-            pool.stop(bedStream)
-            bedStream = 0
-        }
-    }
-
-    private fun startBed() {
-        val id = ids[BED] ?: return
-        if (id !in loaded) return
-        bedStream = pool.play(id, gain * BED_GAIN, gain * BED_GAIN, 1, -1, 1f)
-    }
-
-    /** Turn signal ticking ("嗒—嗒", 1.5 Hz). */
+    /** Turn signal relay ticking (−18 dB, 1.5 Hz) while a lane move is being prepared. */
     fun indicator(on: Boolean) {
         if (on == indicatorOn) return
         indicatorOn = on
@@ -72,27 +55,38 @@ class Audio(context: Context) {
         object : Runnable {
             override fun run() {
                 if (!indicatorOn || released) return
-                cue("indicator")
+                cue(INDICATOR, level = INDICATOR_LEVEL)
                 main.postDelayed(this, INDICATOR_MS)
             }
         }
 
-    /** One cue; [pan] −1 = left … +1 = right. */
+    /** The 「叮」 of a clear round: a whole tone higher per combo step (1 … 5). */
+    fun ding(combo: Int) {
+        val step = (combo - 1).coerceIn(0, 4)
+        play(DING, 0f, 1f, 2.0.pow(2.0 * step / 12.0).toFloat())
+    }
+
+    /** One cue; [pan] −1 = left … +1 = right. Real-world sounds get ±5 % pitch. */
     fun cue(name: String, pan: Float = 0f, level: Float = 1f) {
+        val rate = if (name in REAL) 1f + (Random.nextFloat() - 0.5f) * 0.10f else 1f
+        play(name, pan, level, rate)
+    }
+
+    private fun play(name: String, pan: Float, level: Float, rate: Float) {
         if (released) return
         val id = ids[name] ?: return
-        if (gain <= 0f) return
+        if (gain <= 0f || id !in loaded) return
+        streams[name]?.let { pool.stop(it) }
         val p = pan.coerceIn(-1f, 1f)
         val l = gain * level * (if (p > 0) 1f - p * 0.7f else 1f)
         val r = gain * level * (if (p < 0) 1f + p * 0.7f else 1f)
-        pool.play(id, l, r, 2, 0, 1f)
+        streams[name] = pool.play(id, l, r, 2, 0, rate.coerceIn(0.5f, 2f))
     }
 
     fun stopAll() {
         indicator(false)
-        bed(false)
-        pool.autoPause()
-        pool.autoResume()
+        for (s in streams.values) pool.stop(s)
+        streams.clear()
     }
 
     fun release() {
@@ -104,9 +98,17 @@ class Audio(context: Context) {
     }
 
     companion object {
-        const val BED = "idle_bed"
-        private const val BED_GAIN = 0.6f
+        const val INDICATOR = "indicator"
+        const val TICK = "tick"
+        const val DING = "ding"
+        const val RECORD = "record"
+        const val TIMEOUT = "timeout"
+        const val LATCH = "door_latch"
+        const val BELL = "bike_bell"
+        const val ALERT = "near_miss"
         private const val INDICATOR_MS = 667L
-        val NAMES = listOf("indicator", "turn_tick", BED, "horn", "screech", "bike_bell", "ebike_brake", "door_open", "door_close", "success", "near_miss")
+        private const val INDICATOR_LEVEL = 0.35f
+        val NAMES = listOf(INDICATOR, TICK, DING, RECORD, TIMEOUT, LATCH, BELL, ALERT)
+        private val REAL = setOf(INDICATOR, LATCH, BELL, TICK)
     }
 }

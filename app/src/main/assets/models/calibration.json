@@ -292,5 +292,36 @@
   "suv front logo: 828 texels -> rgb(120, 25, 41)",
   "suv rear badge: 78 texels -> rgb(119, 30, 46)",
   "suv rear plate: 798 texels -> rgb(118, 13, 29)"
- ]
+ ],
+ "tree": {
+  "forwardAxis": "-Z",
+  "yawDeg": 0.0,
+  "scale": 1.2,
+  "translation": [
+   -0.0,
+   -0.0,
+   -0.0
+  ],
+  "bboxMin": [
+   -2.12956908898437,
+   0.0,
+   -1.960738526682857
+  ],
+  "bboxMax": [
+   2.12956908898437,
+   5.0,
+   1.960738526682857
+  ],
+  "modelSize": {
+   "L": 3.921477053365714,
+   "W": 4.25913817796874,
+   "H": 5.0
+  },
+  "designM": {
+   "L": 4.705772464038857,
+   "W": 5.110965813562488,
+   "H": 6.0
+  },
+  "source": "Tripo text-to-3D tree (dog-manners v0.1.2 tree_linden.glb, decimated there), roadside tree B12"
+ }
 }

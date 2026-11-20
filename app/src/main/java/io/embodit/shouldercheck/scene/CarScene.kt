@@ -1,6 +1,7 @@
 package io.embodit.shouldercheck.scene
 
 import android.content.Context
+import android.content.res.Resources
 import android.os.SystemClock
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -12,6 +13,7 @@ import com.pico.spatial.core.ecs.Entity
 import com.pico.spatial.core.ecs.HoverEffectComponent
 import com.pico.spatial.core.ecs.InteractableComponent
 import com.pico.spatial.core.ecs.ModelEntity
+import com.pico.spatial.core.ecs.PointLightComponent
 import com.pico.spatial.core.ecs.SceneUpdateContext
 import com.pico.spatial.core.ecs.System
 import com.pico.spatial.core.ecs.TransformComponent
@@ -27,13 +29,10 @@ import com.pico.spatial.core.math.Quat as SdkQuat
 import com.pico.spatial.core.math.Vector3
 import com.pico.spatial.ui.foundation.content.SpatialViewAttachments
 import io.embodit.shouldercheck.app.AppController
-import io.embodit.shouldercheck.app.Base
 import io.embodit.shouldercheck.app.CtrlIn
 import io.embodit.shouldercheck.app.DebugCommands
 import io.embodit.shouldercheck.app.FrameInput
 import io.embodit.shouldercheck.app.HeadIn
-import io.embodit.shouldercheck.app.P1Page
-import io.embodit.shouldercheck.domain.ActorKind
 import io.embodit.shouldercheck.domain.Angles
 import io.embodit.shouldercheck.domain.Cabin
 import io.embodit.shouldercheck.domain.CabinLayout
@@ -41,7 +40,9 @@ import io.embodit.shouldercheck.domain.Dir
 import io.embodit.shouldercheck.domain.DoorTargets
 import io.embodit.shouldercheck.domain.GazeRay
 import io.embodit.shouldercheck.domain.Hand
+import io.embodit.shouldercheck.domain.HudLayout
 import io.embodit.shouldercheck.domain.Layout
+import io.embodit.shouldercheck.domain.MirrorAims
 import io.embodit.shouldercheck.domain.MirrorId
 import io.embodit.shouldercheck.domain.Part
 import io.embodit.shouldercheck.domain.PartMat
@@ -53,18 +54,21 @@ import io.embodit.shouldercheck.domain.Road
 import io.embodit.shouldercheck.domain.RoadLayout
 import io.embodit.shouldercheck.domain.Seat
 import io.embodit.shouldercheck.domain.Situation
+import io.embodit.shouldercheck.domain.StripType
+import io.embodit.shouldercheck.domain.Target
 import io.embodit.shouldercheck.domain.TrafficSide
 import io.embodit.shouldercheck.domain.Vec3
+import io.embodit.shouldercheck.domain.hotspotBox
 import io.embodit.shouldercheck.platform.ScLog
 import io.embodit.shouldercheck.platform.input.ControllerInput
 import io.embodit.shouldercheck.platform.tracking.EyeTracker
-import io.embodit.shouldercheck.platform.tracking.HandTracker
 import io.embodit.shouldercheck.platform.tracking.HeadTracker
 import io.embodit.shouldercheck.platform.tracking.TrackerForce
+import io.embodit.shouldercheck.ui.components.localizedResources
 import io.embodit.shouldercheck.ui.theme.ScColors
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.sin
+import kotlin.math.floor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -83,28 +87,13 @@ class ScFrameSystem : System() {
     }
 }
 
-/** Pooled panel ids and sizes (dp). */
+/** Pooled panel ids and sizes (dp): only the three mirrors are attachment panels (design `container.notes`). */
 object PanelIds {
-    const val P1 = "p1"
-    const val P1_TALL = "p1tall"
-    const val P2 = "p2"
-    const val ANG_L = "angL"
-    const val ANG_R = "angR"
     const val MIR_I = "mirI"
     const val MIR_L = "mirL"
     const val MIR_R = "mirR"
 
-    val SIZES: Map<String, Pair<Int, Int>> =
-        linkedMapOf(
-            P1 to (800 to 520),
-            P1_TALL to (800 to 600),
-            P2 to (760 to 176),
-            ANG_L to (200 to 80),
-            ANG_R to (200 to 80),
-            MIR_I to (520 to 140),
-            MIR_L to (360 to 220),
-            MIR_R to (360 to 220),
-        )
+    val SIZES: Map<String, Pair<Int, Int>> = linkedMapOf(MIR_I to (520 to 140), MIR_L to (360 to 220), MIR_R to (360 to 220))
 
     /** Mirror panels: 1 dp = 0.5 mm, so the glass is exactly the design size (MIR-I 0.26 × 0.07, sides 0.18 × 0.11). */
     const val MIRROR_SCALE = 0.625
@@ -117,15 +106,15 @@ object PanelIds {
 }
 
 /**
- * The car and the street (design `entities3d`, `ecs`, `budget`): programmatic cabin for both seats (doors on hinges,
- * mirror housings, hood), street (textured road, kerb, sidewalk, bike lane, trees, building blocks, bus stop,
- * intersection for lesson 8), sky dome; GLB road users per question; ghost car, gaze dot + trail, guide rings, demo hand,
- * alert frame, turn arcs; the panel pool; the mirror pictures (~20 Hz). Resource creation is queued (≤ 2 per frame while
- * frames are fast, one per 1.2 s while the idle emulator renders slowly: factory ANR finding).
+ * The car and the street (design `assets`, `model`): programmatic driver's cabin (doors on hinges, mirror housings, hood),
+ * the street of the round's situation (textured road, kerb, sidewalk, bike lane, Tripo trees, building blocks), sky dome;
+ * GLB road users; the 3D HUD ([Hud3D]); the three mirror pictures (~20 Hz). Resource creation is queued (≤ 2 per frame
+ * while frames are fast: design `container.lifecycle`).
  *
- * Car frame: the car root sits at E0 with yaw only ([Placement.seatFrame], D9); every car-fixed entity is its child, in
- * the current seat's eye frame. Seat placement happens only on 坐好了 / 回正 (before that the car keeps itself in front
- * of the head, so S00 / S01 are seen at once).
+ * Car frame: the car root sits at E0 with yaw only ([Placement.seatFrame], D9), placed automatically once the head pose
+ * is valid and steady (design `container.placement`); every car-fixed entity is its child. Your car "moving" is the
+ * street and the traffic shifting the other way (sideways move, pull-out) and the road scrolling at 36 km/h while
+ * cruising (comfort mode: no scroll).
  */
 class CarScene(private val context: Context) {
     val panelShown = mutableStateMapOf<String, Boolean>()
@@ -135,7 +124,6 @@ class CarScene(private val context: Context) {
     private val head = HeadTracker()
     private val eyes = EyeTracker()
     private val controllers = ControllerInput()
-    private val hands = HandTracker()
 
     private var scope: CoroutineScope? = null
     private var attachments: SpatialViewAttachments? = null
@@ -145,6 +133,7 @@ class CarScene(private val context: Context) {
     private var pool: PanelPool? = null
     private val shared = SharedResources()
     private var models: Models? = null
+    private var hud: Hud3D? = null
     private var attached = false
     private var paused = false
     private var attachMs = 0L
@@ -162,56 +151,43 @@ class CarScene(private val context: Context) {
     private var ringMesh: MeshResource? = null
     private var discMesh: MeshResource? = null
     private var roadMesh: MeshResource? = null
-    private var quadMesh: MeshResource? = null
     private val mats = HashMap<String, Material>()
     private var roadMat: UnlitMaterial? = null
-    private var testTexture: TextureResource? = null
+    private var skyMat: UnlitMaterial? = null
+    private var skyDay: TextureResource? = null
+    private var skyDusk: TextureResource? = null
     private val roadTextures = HashMap<String, TextureResource>()
-    private var ghostMat: UnlitMaterial? = null
-    private var ghostRed: UnlitMaterial? = null
-    private var alertMat: UnlitMaterial? = null
+    private var physicsMat: PhysicsMaterialResource? = null
 
     // groups
-    private var cabinGroups = HashMap<Seat, Entity>()
-    private var cabinParts = HashMap<Seat, List<Pair<Entity, Part>>>()
-    private var doorPivots = HashMap<Seat, Pair<Entity, Dir>>()
-
-    /** Tap holder of each seat's opening door (D50): Collision + Interactable + system HoverEffect, door meshes below. */
-    private val doorTaps = HashMap<Seat, Entity>()
-    private var doorTapOn = HashMap<Seat, Boolean>()
+    private var cabinGroup: Entity? = null
+    private var cabinParts: List<Pair<Entity, Part>> = emptyList()
+    private var doorPivot: Pair<Entity, Dir>? = null
+    private var doorHolder: Entity? = null
+    private var doorShape: ShapeResource? = null
+    private var doorTapOn = false
     private var cabinSide: TrafficSide? = null
     private var streetGroup: Entity? = null
+    private var streetMover: Entity? = null
     private var streetKey: String? = null
-    private var roadEntity: Entity? = null
-    private var testQuad: Entity? = null
-    private var testRoadCard: Entity? = null
-    private var testMat: UnlitMaterial? = null
-    private val faded = HashSet<Entity>()
-    private var lastFadeMs = 0L
+    private val trees = ArrayList<Entity>()
+    private val lamps = ArrayList<Entity>()
+    private var scroll = 0.0
 
     // dynamic
     private val actorInstances = HashMap<String, Entity>()
     private val instancePool = HashMap<String, ArrayList<Entity>>()
-    private var bus: Entity? = null
-    private var ghost: Entity? = null
-    private val ghostParts = ArrayList<Entity>()
-    private var gazeDot: Entity? = null
-    private val trail = ArrayList<Entity>()
-    private val trailPts = ArrayDeque<Pair<Long, Vec3>>()
-    private val guides = ArrayList<Entity>()
-    private var hand: Entity? = null
-    private var alert: Entity? = null
-    private val arcDots = HashMap<Dir, List<Entity>>()
     private val replayDots = ArrayList<Entity>()
     private var lightEntity: Entity? = null
     private var fillEntity: Entity? = null
+    private var duskOn: Boolean? = null
 
     // placement
     private var car: Pose? = null
     private var appliedEpoch = -1
+    private var settleStartMs = -1L
+    private var settleYaw = 0.0
     private var firstValidMs = -1L
-    private var lastProvisionalMs = 0L
-    private var reseatDone = false
     private var startupLogs = 0
 
     // mirrors
@@ -221,9 +197,11 @@ class CarScene(private val context: Context) {
     private var frameTimeAcc = 0.0
     private var frameCount = 0
 
-    // N5 spike
-    private var lastStick = 0f
-    private var stickLogged = false
+    // controller-ray fallback
+    private val triggerDown = HashMap<Hand, Boolean>()
+
+    private var resources: Resources = context.resources
+    private var resLang: Any? = null
 
     // ======================================================================================== lifecycle
 
@@ -251,21 +229,19 @@ class CarScene(private val context: Context) {
         val p = PanelPool(carE, root) { id, shown -> panelShown[id] = shown }
         for ((id, size) in PanelIds.SIZES) p.slot(id, size.first.toDouble(), size.second.toDouble())
         pool = p
-        // light: the sun 45° from the car's right front, a weak fill from the left back (budget.lights)
+        // light: the sun 45° from the car's right front, a weak fill from the left back (design assets.lighting)
         lightEntity = Entity().named("sun").also {
-            it.components.set(DirectionalLightComponent(Color4(1f, 0.97f, 0.92f, 1f), SUN_LUX, false))
             carE.addChild(it)
             it.setLocal(rotation = Layout.facing(Vec3.ZERO, Vec3(0.6, 0.75, -0.6)))
         }
         fillEntity = Entity().named("fill").also {
-            it.components.set(DirectionalLightComponent(Color4(0.85f, 0.9f, 1f, 1f), FILL_LUX, false))
             carE.addChild(it)
             it.setLocal(rotation = Layout.facing(Vec3.ZERO, Vec3(-0.5, 0.5, 0.7)))
         }
+        setLights(false)
         head.start()
         eyes.start()
         controllers.start()
-        hands.start()
         models = runCatching { Models(context) }.onFailure { ScLog.e("MODEL calibration failed: $it", it) }.getOrNull()
         queueBuild()
         bindPanels(attachments)
@@ -292,19 +268,21 @@ class CarScene(private val context: Context) {
         head.stop()
         eyes.stop()
         controllers.stop()
-        hands.stop()
         pool?.release()
         pool = null
         panelShown.clear()
+        hud?.close()
+        hud = null
         runCatching { stageRoot?.destroy(true) }
         stageRoot = null
         carRoot = null
         models?.close()
         models = null
-        doorTaps.clear()
-        doorTapOn.clear()
-        doorShapes.clear()
+        doorHolder = null
+        doorShape = null
         physicsMat = null
+        trees.clear()
+        lamps.clear()
         shared.close()
         ScLog.i("SCENE detached (trackers stopped)")
     }
@@ -314,7 +292,6 @@ class CarScene(private val context: Context) {
         head.stop()
         eyes.stop()
         controllers.stop()
-        hands.stop()
         ScLog.i("SCENE paused")
     }
 
@@ -323,28 +300,49 @@ class CarScene(private val context: Context) {
         head.start()
         eyes.start()
         controllers.start()
-        hands.start()
         paused = false
         ScLog.i("SCENE resumed")
+    }
+
+    private fun setLights(dusk: Boolean) {
+        if (duskOn == dusk) return
+        duskOn = dusk
+        // lux scale (factory finding 2026-11-12); dusk: ambient −60 %, warm low sun (design scoring.levels[3].env)
+        lightEntity?.components?.set(DirectionalLightComponent(if (dusk) Color4(1f, 0.78f, 0.6f, 1f) else Color4(1f, 0.97f, 0.92f, 1f), if (dusk) SUN_LUX * 0.4f else SUN_LUX, false))
+        fillEntity?.components?.set(DirectionalLightComponent(Color4(0.85f, 0.9f, 1f, 1f), if (dusk) FILL_LUX * 0.4f else FILL_LUX, false))
+        val tex = if (dusk) skyDusk else skyDay
+        if (tex != null) skyMat?.setBaseColorTexture(tex)
+        for (l in lamps) l.enabled = dusk
+        // unlit street surfaces do not see the lights: dim them with the dusk (road, blocks, far carriageway)
+        val k = if (dusk) DUSK_DIM else 1f
+        roadMat?.setBaseColor(Color4(k, k, k, 1f))
+        (mats["building"] as? UnlitMaterial)?.setBaseColor(Color4(k, k, k, 1f))
+        (mats["buildingFar"] as? UnlitMaterial)?.setBaseColor(ScColors.BuildingFar.shade(0.95f * k).color4())
+        (mats["asphalt"] as? UnlitMaterial)?.setBaseColor(ScColors.Road.shade(0.9f * k).color4())
+        ScLog.i("LIGHT dusk=$dusk")
     }
 
     // ======================================================================================== build
 
     private fun mat(key: String): Material = mats.getValue(key)
 
+    private fun physics(): PhysicsMaterialResource = physicsMat ?: shared.keep(PhysicsMaterialResource()).also { physicsMat = it }
+
     private fun queueBuild() {
         heavy += "cube" to { cube = shared.keep(Meshes.unitCube()) }
         heavy += "ball" to { ball = shared.keep(Meshes.sphere("ball")) }
         heavy += "sky" to {
-            val tex = shared.keep(TextureResource.create(Textures.sky()))
-            val m = unlit(shared, Color.White, texture = tex, twoSided = true)
-            val dome = ModelEntity(shared.keep(Meshes.sphere("sky", inward = true, rings = 18, sectors = 24)), m).named("sky")
+            skyDay = shared.keep(TextureResource.create(Textures.sky()))
+            skyDusk = shared.keep(TextureResource.create(Textures.duskSky()))
+            val m = unlit(shared, Color.White, texture = skyDay, twoSided = true)
+            skyMat = m
+            val dome = ModelEntity(shared.keep(Meshes.sphere("skyDome", inward = true, rings = 18, sectors = 24)), m).named("skyDome")
             dome.setLocal(position = Vec3(0.0, 0.0, 0.0), scale = Vec3(SKY_D, SKY_D, SKY_D))
             carRoot?.addChild(dome)
         }
         heavy += "roadMesh" to { roadMesh = shared.keep(Meshes.road("road", -ROAD_HALF, ROAD_HALF, Textures.DASH_CYCLE_M)) }
         light += "materials" to { makeMaterials() }
-        heavy += "roadTexture" to { roadTexture(c.displayScenario().road) }
+        heavy += "roadTexture" to { roadTexture(c.displayRound().road) }
         light += "ground" to {
             ModelEntity(cube!!, unlit(shared, ScColors.Sidewalk.shade(0.78f))).named("ground").also {
                 it.setLocal(position = Vec3(0.0, Road.ROAD_Y - 0.06, 0.0), scale = Vec3(900.0, 0.05, 900.0))
@@ -355,15 +353,12 @@ class CarScene(private val context: Context) {
         heavy += "ring" to { ringMesh = shared.keep(Meshes.ring("wheel", tube = 0.05)) }
         light += "cabin" to { ensureCabin() }
         heavy += "disc" to { discMesh = shared.keep(Meshes.disc("disc")) }
-        heavy += "glowTex" to {
-            val glow = shared.keep(TextureResource.create(Textures.radial(64)))
-            val ring = shared.keep(TextureResource.create(Textures.radial(96, ring = true)))
-            mats["glow"] = unlit(shared, ScColors.Gaze, BlendingMode.TRANSPARENT, opacity = 0.9f, twoSided = true, depthWrite = false, texture = glow)
-            mats["guide"] = unlit(shared, ScColors.Guide, BlendingMode.TRANSPARENT, opacity = 0.95f, twoSided = true, depthWrite = false, texture = ring)
+        light += "hud" to {
+            val car = carRoot
+            val world = worldRoot
+            if (car != null && world != null) hud = Hud3D(shared, car, world, physics())
         }
         light += "dynamic" to { makeDynamic() }
-        heavy += "quad" to { quadMesh = shared.keep(Meshes.quad("quad")) }
-        heavy += "testTex" to { testTexture = shared.keep(TextureResource.create(Textures.orientationTest())) }
         light += "glb" to { loadModels() }
     }
 
@@ -380,33 +375,18 @@ class CarScene(private val context: Context) {
         mats["kerb"] = pbr(shared, ScColors.Kerb)
         mats["sidewalk"] = pbr(shared, ScColors.Sidewalk)
         mats["asphalt"] = unlit(shared, ScColors.Road.shade(0.9f))
-        mats["leaf"] = pbr(shared, ScColors.TreeLeaf)
-        mats["trunk"] = pbr(shared, ScColors.TreeTrunk)
         mats["fence"] = pbr(shared, ScColors.Kerb.shade(0.9f), roughness = 0.5f)
-        mats["shelter"] = pbr(shared, ScColors.BuildingNear.shade(0.8f), roughness = 0.5f)
         mats["line"] = unlit(shared, ScColors.LaneLine)
-        mats["bus"] = pbr(shared, ScColors.Bus, roughness = 0.5f)
-        mats["busGlass"] = pbr(shared, ScColors.Dash, roughness = 0.3f)
         val tex = shared.keep(TextureResource.create(Textures.gradient(ScColors.BuildingNear, ScColors.BuildingFar)))
         mats["building"] = unlit(shared, Color.White, texture = tex)
         mats["buildingFar"] = unlit(shared, ScColors.BuildingFar.shade(0.95f), texture = tex)
-        mats["arc"] = unlit(shared, ScColors.Gaze)
         mats["trace"] = unlit(shared, ScColors.Gaze.shade(0.9f))
-        val hood = argbColor(c.hoodColour)
-        ghostMat = unlit(shared, hood, BlendingMode.TRANSPARENT, opacity = 0.3f, depthWrite = false).also { mats["ghost"] = it }
-        ghostRed = unlit(shared, ScColors.Miss, BlendingMode.TRANSPARENT, opacity = 0.45f, depthWrite = false).also { mats["ghostRed"] = it }
-        alertMat = unlit(shared, ScColors.Miss, BlendingMode.TRANSPARENT, opacity = 0.0f, depthWrite = false).also { mats["alert"] = it }
+        val glow = shared.keep(TextureResource.create(Textures.radial(64)))
+        mats["lamp"] = unlit(shared, ScColors.StreetLight, BlendingMode.TRANSPARENT, opacity = 0.95f, twoSided = true, depthWrite = false, texture = glow)
         roadMat = unlit(shared, Color.White)
     }
 
-    private fun roadKey(road: RoadLayout): String {
-        val g =
-            when (road.situation) {
-                Situation.PULL_OUT, Situation.RIGHT_TURN, Situation.DOOR_DRIVER, Situation.DOOR_REAR -> road.situation.id
-                else -> "lanes"
-            }
-        return "$g:${road.side}"
-    }
+    private fun roadKey(road: RoadLayout): String = "${road.situation.family}:${road.side}"
 
     private fun roadTexture(road: RoadLayout): TextureResource {
         val key = roadKey(road)
@@ -418,42 +398,34 @@ class CarScene(private val context: Context) {
     }
 
     private fun roadExtent(road: RoadLayout): Pair<Double, Double> {
-        val drive = road.strips.filter { it.type != io.embodit.shouldercheck.domain.StripType.SIDEWALK }
+        val drive = road.strips.filter { it.type != StripType.SIDEWALK }
         return drive.minOf { it.xMin } to drive.maxOf { it.xMax }
     }
 
     private fun model(mesh: MeshResource, material: Material, name: String, parent: Entity?): ModelEntity = ModelEntity(mesh, material).named(name).also { parent?.addChild(it) } as ModelEntity
 
-    /** Unit-cube box of [size] at [centre]. */
-    private fun box(parent: Entity?, name: String, centre: Vec3, size: Vec3, material: Material, rotation: Quat = Quat.IDENTITY): Entity =
+    /** Unit-cube slab of [size] at [centre] (road furniture, building blocks, cabin trim). */
+    private fun slab(parent: Entity?, name: String, centre: Vec3, size: Vec3, material: Material, rotation: Quat = Quat.IDENTITY): Entity =
         model(cube!!, material, name, parent).also { it.setLocal(position = centre, rotation = rotation, scale = size) }
 
     // ---------------------------------------------------------------- cabin
 
     private fun ensureCabin() {
         val side = c.progress.settings.traffic
-        if (cabinSide == side && cabinGroups.isNotEmpty()) return
+        if (cabinSide == side && cabinGroup != null) return
         if (cube == null || ringMesh == null || mats.isEmpty()) return
-        for (g in cabinGroups.values) runCatching { g.destroy(true) }
-        cabinGroups.clear()
-        cabinParts.clear()
-        doorPivots.clear()
-        doorTaps.clear()
-        doorTapOn.clear()
-        faded.clear()
-        for (seat in Seat.values()) {
-            val layout = Layout.cabin(seat, side)
-            val group = Entity().named("cabin:$seat")
-            carRoot?.addChild(group)
-            cabinGroups[seat] = group
-            cabinParts[seat] = buildCabin(group, layout, seat)
-            group.enabled = false
-        }
+        cabinGroup?.let { runCatching { it.destroy(true) } }
+        doorTapOn = false
+        val layout = Layout.cabin(Seat.DRIVER, side)
+        val group = Entity().named("cabin")
+        carRoot?.addChild(group)
+        cabinGroup = group
+        cabinParts = buildCabin(group, layout)
         cabinSide = side
-        ScLog.i("CABIN built side=$side parts=${cabinParts.mapValues { it.value.size }}")
+        ScLog.i("CABIN built side=$side parts=${cabinParts.size}")
     }
 
-    private fun buildCabin(group: Entity, layout: CabinLayout, seat: Seat): List<Pair<Entity, Part>> {
+    private fun buildCabin(group: Entity, layout: CabinLayout): List<Pair<Entity, Part>> {
         val out = ArrayList<Pair<Entity, Part>>()
         for (p in layout.parts) {
             val mesh = if (p.mesh == PartMesh.RING) ringMesh!! else cube!!
@@ -466,26 +438,26 @@ class CarScene(private val context: Context) {
             val pivot = Entity().named(d.name)
             group.addChild(pivot)
             pivot.setLocal(position = d.hinge)
-            // the opening door hangs under a tap holder centred on its click box (the shape is centred on its entity),
-            // so the system hover lights the door's own meshes and a hit on any of them resolves up to the holder
+            // the opening door hangs under a tap holder named door:handle, centred on its click box, so the system hover
+            // lights the door's own meshes and a hit on any of them resolves up to the holder (D50)
             val box = if (d.opens) tapBox else null
             val centre = box?.let { (it.min + it.max) * 0.5 } ?: d.hinge
             val parent =
                 if (box != null) {
-                    Entity().named(DoorTargets.holder(seat)).also {
+                    Entity().named(Target.DOOR.id).also {
                         pivot.addChild(it)
                         it.setLocal(position = centre - d.hinge)
-                        doorTaps[seat] = it
-                        doorShapes[seat] = shared.keep(ShapeResource.createBox((box.max - box.min).sdk()))
+                        doorHolder = it
+                        // D59: cached across frames → global
+                        doorShape = shared.keep(ShapeResource.createBox((box.max - box.min).sdk()))
                     }
                 } else pivot
             for (p in d.parts) {
-                val e = model(cube!!, mat(p.mat.name), p.name, parent)
+                val e = model(cube!!, mat(p.mat.name), if (box != null) "${Target.DOOR.id}/${p.name}" else p.name, parent)
                 e.setLocal(position = p.centre - centre, rotation = p.rotation, scale = p.size)
-                // a closed door is part of the cabin for the D20 test
                 out += e to p
             }
-            if (d.opens) doorPivots[seat] = pivot to d.side
+            if (d.opens) doorPivot = pivot to d.side
         }
         return out
     }
@@ -494,15 +466,21 @@ class CarScene(private val context: Context) {
 
     private fun ensureStreet() {
         if (cube == null || roadMesh == null || mats.isEmpty()) return
-        val sc = c.displayScenario()
-        val key = roadKey(sc.road) + ":" + sc.seat
+        val r = c.displayRound()
+        val key = roadKey(r.road)
         if (key == streetKey) return
         streetGroup?.let { runCatching { it.destroy(true) } }
+        trees.clear()
+        lamps.clear()
         val g = Entity().named("street")
         carRoot?.addChild(g)
         streetGroup = g
+        val mover = Entity().named("streetMover")
+        g.addChild(mover)
+        streetMover = mover
         streetKey = key
-        buildStreet(g, sc.road)
+        buildStreet(mover, r.road)
+        duskOn = null
         ScLog.i("STREET built $key")
     }
 
@@ -510,64 +488,57 @@ class CarScene(private val context: Context) {
         val y = Road.ROAD_Y
         val (x0, x1) = roadExtent(road)
         val mat = roadMat!!
-        mat.setBaseColorTexture(if (c.testTex) testTexture ?: roadTexture(road) else roadTexture(road))
-        roadEntity = model(roadMesh!!, mat, "road", g).also { it.setLocal(position = Vec3(x0, y, 0.0), scale = Vec3(x1 - x0, 1.0, 1.0)) }
+        mat.setBaseColorTexture(roadTexture(road))
+        model(roadMesh!!, mat, "road", g).setLocal(position = Vec3(x0, y, 0.0), scale = Vec3(x1 - x0, 1.0, 1.0))
         val kerbSide = if (road.kerbX > road.egoX) 1.0 else -1.0
         val farEdge = if (kerbSide > 0) x0 else x1
-        val turn = road.situation == Situation.RIGHT_TURN
-        val gapFrom = -27.0
-        val gapTo = -13.0
-        // z spans of street furniture (split at the intersection for lesson 8)
-        val spans = if (turn) listOf(-ROAD_HALF to gapFrom, gapTo to ROAD_HALF) else listOf(-ROAD_HALF to ROAD_HALF)
-        for ((za, zb) in spans) {
-            val zc = (za + zb) / 2
-            val len = zb - za
-            box(g, "kerb", Vec3(road.kerbX + kerbSide * 0.1, y + 0.075, zc), Vec3(0.2, 0.15, len), mat("kerb"))
-            box(g, "sidewalk", Vec3(road.kerbX + kerbSide * 2.1, y + 0.07, zc), Vec3(3.8, 0.14, len), mat("sidewalk"))
-            // far side: median fence, opposite carriageway, far sidewalk
-            box(g, "fence", Vec3(farEdge - kerbSide * 0.3, y + 0.5, zc), Vec3(0.08, 1.0, len), mat("fence"))
-            box(g, "fenceBase", Vec3(farEdge - kerbSide * 0.3, y + 0.05, zc), Vec3(0.35, 0.1, len), mat("kerb"))
-            box(g, "opposite", Vec3(farEdge - kerbSide * 5.6, y + 0.002, zc), Vec3(10.0, 0.004, len), mat("asphalt"))
-            box(g, "farSidewalk", Vec3(farEdge - kerbSide * 12.6, y + 0.07, zc), Vec3(4.0, 0.14, len), mat("sidewalk"))
-        }
-        // trees on the sidewalk, buildings behind both sidewalks
-        var z = -96.0
-        while (z < 96.0) {
-            if (!(turn && z > gapFrom - 2 && z < gapTo + 2)) {
-                val tx = road.kerbX + kerbSide * 1.2
-                box(g, "trunk", Vec3(tx, y + 1.2, z), Vec3(0.22, 2.4, 0.22), mat("trunk"))
-                model(ball!!, mat("leaf"), "crown", g).setLocal(position = Vec3(tx, y + 3.3, z), scale = Vec3(2.6, 2.4, 2.6))
+        val len = 2 * ROAD_HALF
+        slab(g, "kerb", Vec3(road.kerbX + kerbSide * 0.1, y + 0.075, 0.0), Vec3(0.2, 0.15, len), mat("kerb"))
+        slab(g, "sidewalk", Vec3(road.kerbX + kerbSide * 2.1, y + 0.07, 0.0), Vec3(3.8, 0.14, len), mat("sidewalk"))
+        // far side: median fence, opposite carriageway, far sidewalk
+        slab(g, "fence", Vec3(farEdge - kerbSide * 0.3, y + 0.5, 0.0), Vec3(0.08, 1.0, len), mat("fence"))
+        slab(g, "fenceBase", Vec3(farEdge - kerbSide * 0.3, y + 0.05, 0.0), Vec3(0.35, 0.1, len), mat("kerb"))
+        slab(g, "opposite", Vec3(farEdge - kerbSide * 5.6, y + 0.002, 0.0), Vec3(10.0, 0.004, len), mat("asphalt"))
+        slab(g, "farSidewalk", Vec3(farEdge - kerbSide * 12.6, y + 0.07, 0.0), Vec3(4.0, 0.14, len), mat("sidewalk"))
+        // trees (Tripo, B12) on the sidewalk every 18 m and street lamps every 36 m: both repeat every 36 m, so the road
+        // scroll wraps every 36 m without a jump
+        var z = -TREE_RANGE
+        while (z <= TREE_RANGE + 1e-6) {
+            val tx = road.kerbX + kerbSide * 1.3
+            val holder = Entity().named("treeSpot")
+            g.addChild(holder)
+            holder.setLocal(position = Vec3(tx, y + 0.14, z), rotation = Quat.yaw((z * 37) % 360))
+            trees += holder
+            if (abs(z % 36.0) < 1e-6) {
+                val lamp = model(discMesh ?: cube!!, mat("lamp"), "lamp", g)
+                lamp.setLocal(position = Vec3(road.kerbX + kerbSide * 0.6, y + 5.0, z + 9.0), rotation = Layout.rotX(-90.0), scale = Vec3(1.2, 1.2, 1.0))
+                lamp.components.set(PointLightComponent(Color4(1f, 0.85f, 0.62f, 1f), LAMP_LUX, 14f))
+                lamp.enabled = false
+                lamps += lamp
             }
-            z += 12.0
+            z += 18.0
         }
-        var bz = -120.0
+        attachTrees()
+        // building blocks behind both sidewalks: 33.5 m long + 2.5 m gap = the 36 m period
+        var bz = -144.0
         var i = 0
-        while (bz < 120.0) {
-            val len = 18.0 + (i * 7) % 13
+        while (bz < 144.0) {
             val h = 9.0 + (i * 11) % 16
-            val zc = bz + len / 2
-            if (!(turn && zc + len / 2 > gapFrom - 1 && zc - len / 2 < gapTo + 1)) {
-                box(g, "building", Vec3(road.kerbX + kerbSide * (4.2 + 7.0), y + h / 2, zc), Vec3(14.0, h, len), mat("building"))
-                box(g, "buildingFar", Vec3(farEdge - kerbSide * (14.8 + 7.0), y + h * 0.6, zc + 5), Vec3(14.0, h * 1.2, len), mat("buildingFar"))
-            }
-            bz += len + 2.5
+            val zc = bz + 33.5 / 2
+            slab(g, "building", Vec3(road.kerbX + kerbSide * (4.2 + 7.0), y + h / 2, zc), Vec3(14.0, h, 33.5), mat("building"))
+            slab(g, "buildingFar", Vec3(farEdge - kerbSide * (14.8 + 7.0), y + h * 0.6, zc + 5), Vec3(14.0, h * 1.2, 33.5), mat("buildingFar"))
+            bz += 36.0
             i++
         }
-        // bus stop (lane scenes: the bus of lesson 5 stops at z ≈ −14)
-        if (road.situation == Situation.LANE_LEFT || road.situation == Situation.LANE_RIGHT) {
-            val sx = road.kerbX + kerbSide * 2.6
-            box(g, "shelterRoof", Vec3(sx, y + 2.5, -16.0), Vec3(1.8, 0.08, 4.5), mat("shelter"))
-            box(g, "shelterBack", Vec3(sx + kerbSide * 0.85, y + 1.3, -16.0), Vec3(0.06, 2.4, 4.5), mat("shelter"))
-            box(g, "shelterPostA", Vec3(sx - kerbSide * 0.8, y + 1.25, -13.9), Vec3(0.08, 2.5, 0.08), mat("fence"))
-            box(g, "shelterPostB", Vec3(sx - kerbSide * 0.8, y + 1.25, -18.1), Vec3(0.08, 2.5, 0.08), mat("fence"))
-        }
-        // intersection (lesson 8): the cross street, its stop line
-        if (turn) {
-            box(g, "crossRoad", Vec3(road.egoX, y + 0.004, (gapFrom + gapTo) / 2), Vec3(80.0, 0.004, gapTo - gapFrom), mat("asphalt"))
-            val lanes = road.strips.filter { it.type != io.embodit.shouldercheck.domain.StripType.SIDEWALK && it.type != io.embodit.shouldercheck.domain.StripType.BIKE_LANE }
-            val sx0 = lanes.minOf { it.xMin }
-            val sx1 = lanes.maxOf { it.xMax }
-            box(g, "stopLine", Vec3((sx0 + sx1) / 2, y + 0.008, gapTo + 0.3), Vec3(sx1 - sx0, 0.004, 0.4), mat("line"))
+    }
+
+    /** Puts a tree instance on every tree spot once the model is loaded. */
+    private fun attachTrees() {
+        val m = models ?: return
+        if (!m.loaded("tree")) return
+        for (spot in trees) {
+            if (runCatching { spot.getChildren() }.getOrNull()?.isNotEmpty() == true) continue
+            m.instance("tree")?.let { spot.addChild(it) }
         }
     }
 
@@ -575,68 +546,27 @@ class CarScene(private val context: Context) {
 
     private fun makeDynamic() {
         val root = carRoot ?: return
-        // ghost car: your car's shell, 30 % (entities3d ghostCar, 3 meshes)
-        val gr = Entity().named("ghost")
-        root.addChild(gr)
-        ghostParts += box(gr, "ghostBody", Vec3(0.0, 0.62, 0.0), Vec3(1.8, 0.75, 4.6), ghostMat!!)
-        ghostParts += box(gr, "ghostCabin", Vec3(0.0, 1.18, 0.25), Vec3(1.6, 0.42, 2.5), ghostMat!!)
-        ghostParts += box(gr, "ghostWheels", Vec3(0.0, 0.3, 0.0), Vec3(1.7, 0.3, 3.6), ghostMat!!)
-        gr.enabled = false
-        ghost = gr
-        // gaze dot and its 0.6 s trail
-        gazeDot = model(discMesh!!, mat("glow"), "gazeDot", root).also { it.enabled = false }
-        repeat(6) { trail += model(discMesh!!, mat("glow"), "trail$it", root).also { e -> e.enabled = false } }
-        repeat(2) { guides += model(discMesh!!, mat("guide"), "guide$it", root).also { e -> e.enabled = false } }
-        // demo hand: palm and fingers, guide material
-        val hr = Entity().named("demoHand")
-        root.addChild(hr)
-        box(hr, "palm", Vec3.ZERO, Vec3(0.08, 0.025, 0.09), mat("guide"))
-        for (k in 0 until 4) box(hr, "finger$k", Vec3(-0.03 + k * 0.02, 0.0, -0.075), Vec3(0.015, 0.018, 0.06), mat("guide"))
-        box(hr, "thumb", Vec3(0.05, 0.0, -0.01), Vec3(0.015, 0.018, 0.05), mat("guide"), Layout.rotY(-35.0))
-        hr.enabled = false
-        hand = hr
-        // alert frame (head-locked, the only head-locked element): four bars round the view, 0.5 m ahead
-        val al = Entity().named("alert")
-        worldRoot?.addChild(al)
-        box(al, "alertTop", Vec3(0.0, 0.42, -0.5), Vec3(1.1, 0.07, 0.01), alertMat!!)
-        box(al, "alertBottom", Vec3(0.0, -0.42, -0.5), Vec3(1.1, 0.07, 0.01), alertMat!!)
-        box(al, "alertLeft", Vec3(-0.52, 0.0, -0.5), Vec3(0.07, 0.8, 0.01), alertMat!!)
-        box(al, "alertRight", Vec3(0.52, 0.0, -0.5), Vec3(0.07, 0.8, 0.01), alertMat!!)
-        al.enabled = false
-        alert = al
-        for (d in Dir.values()) arcDots[d] = (0 until 16).map { model(ball!!, mat("arc"), "arc$d$it", root).also { e -> e.enabled = false } }
         repeat(40) { replayDots += model(ball!!, mat("trace"), "trace$it", root).also { e -> e.enabled = false } }
-        // the bus of lesson 5 (no GLB): body + window band
-        val b = Entity().named("bus")
-        root.addChild(b)
-        box(b, "busBody", Vec3(0.0, 1.55, 0.0), Vec3(2.5, 2.9, 12.0), mat("bus"))
-        box(b, "busGlass", Vec3(0.0, 2.2, 0.0), Vec3(2.54, 0.9, 12.04), mat("busGlass"))
-        b.enabled = false
-        bus = b
-        testMat = unlit(shared, Color.White, twoSided = true)
-        testQuad = model(quadMesh ?: cube!!, testMat!!, "testQuad", root).also { it.enabled = false }
-        // a 2.5 m card lying on the road ahead, built by the SAME road-mesh function (v grows towards −Z)
-        testRoadCard = model(shared.keep(Meshes.road("roadCard", -1.0, 0.0, 1.0)), testMat!!, "testRoadCard", root).also { it.enabled = false }
     }
 
     private fun loadModels() {
         val m = models ?: return
         scope?.launch {
-            for (role in listOf("sedan", "suv", "ebike", "bike", "moto")) m.load(role)
+            for (role in listOf("sedan", "suv", "ebike", "bike", "moto", "tree")) m.load(role)
+            attachTrees()
             ScLog.i("MODEL all loaded")
         }
     }
 
     private fun runWork(dt: Float, now: Long) {
-        // light items (entities, materials): a few per frame; heavy (mesh / texture): 2 per frame when fast, else 1 per 1.2 s
         var budget = 3
         while (light.isNotEmpty() && budget-- > 0) {
             val (name, work) = light.first()
             val ready = when (name) {
                 "street", "cabin" -> cube != null && roadMesh != null && mats.isNotEmpty() && (name != "cabin" || ringMesh != null)
-                "dynamic" -> discMesh != null && mats.containsKey("glow") && ball != null
+                "dynamic" -> ball != null && mats.isNotEmpty()
                 "ground", "materials" -> cube != null
-                "glb" -> true
+                "hud" -> discMesh != null
                 else -> true
             }
             if (!ready) break
@@ -668,7 +598,8 @@ class CarScene(private val context: Context) {
         if (!attached) return
         val now = SystemClock.elapsedRealtime()
         val dtRaw = if (deltaTime.isFinite() && deltaTime > 0f) deltaTime else 0.016f
-        val dt = dtRaw.coerceAtMost(0.1f).toDouble()
+        // D55: the system may drop the container to 10 fps; the round clock follows the wall clock up to 0.25 s a frame
+        val dt = dtRaw.coerceAtMost(0.25f).toDouble()
         frame++
         frameTimeAcc += dtRaw
         frameCount++
@@ -685,59 +616,63 @@ class CarScene(private val context: Context) {
         val input = readInput(hp, carPose, now, dt)
         c.onFrame(input)
 
-        if (builtReported || cabinGroups.isNotEmpty()) {
+        if (builtReported || cabinGroup != null) {
             ensureCabin()
             ensureStreet()
         }
+        val lang = c.state.value.language
+        if (lang != resLang) {
+            resLang = lang
+            resources = localizedResources(context, lang)
+        }
+        setLights(c.dusk())
         updateCabin()
+        updateStreet(dt)
         updateActors()
-        updateGhost(now)
-        updateGaze(now)
-        updateGuides(now)
-        updateAlert(hp, now)
-        updateArcs()
-        updateTestTex()
-        updatePanels(now)
+        updateTrail()
+        val headPos = c.effHead?.pos ?: Vec3.ZERO
+        hud?.update(resources, c.state.value.hud, Cabin(Seat.DRIVER, c.progress.settings.traffic), headPos, c.effHead?.yaw ?: 0.0, now, frame)
+        updatePanels()
         updateMirrors(now)
         startupLog(hp, now)
     }
 
-    /** Seat placement (D9 placeUpright, yaw only): only on 坐好了 / 回正; before that the car keeps itself in front of you. */
+    /**
+     * Automatic seating (design `container.placement`): once the head pose is valid and has turned < 5° in 0.5 s (at
+     * most 1.5 s after the first valid sample), the car is placed at the head position with its yaw (pitch / roll 0,
+     * D9). 回正 places it again. Until seated the car keeps itself in front of you.
+     */
     private fun placeCar(hp: Pose?, now: Long) {
         val pose = hp ?: return
         val root = carRoot ?: return
+        val yaw = Angles.yawOfRotation(pose.rotation)
         var place = false
         var why = ""
-        if (c.placeEpoch != appliedEpoch) {
+        if (c.placeEpoch != appliedEpoch && c.seated) {
             place = true
-            why = "seat epoch=${c.placeEpoch}"
+            why = "recentre epoch=${c.placeEpoch}"
             appliedEpoch = c.placeEpoch
         } else if (!c.seated) {
-            if (firstValidMs < 0) {
-                firstValidMs = now
-                place = true
-                why = "first valid head pose"
-            } else if (now - firstValidMs < 2000 && now - lastProvisionalMs > 250) {
-                place = true
-                why = "settling"
-            } else if (!reseatDone && car != null) {
-                // P1 more than 70° out of view, or too near / far: put the car back in front once (factory rule)
-                val p1 = Placement.toWorld(car!!, Layout.p1(Seat.DRIVER, c.progress.settings.traffic).centre)
-                val to = p1 - pose.position
-                val off = Angles.between(to, pose.forward)
-                if (off > 70.0 || to.length < 0.5 || to.length > 2.0) {
-                    place = true
-                    reseatDone = true
-                    why = "P1 out of view ${off.toInt()}°"
-                }
+            if (firstValidMs < 0) firstValidMs = now
+            if (settleStartMs < 0 || abs(Angles.wrap(yaw - settleYaw)) > 5.0) {
+                settleStartMs = now
+                settleYaw = yaw
+            }
+            val steady = now - settleStartMs >= 500
+            val timeout = now - firstValidMs >= 1500
+            place = true
+            why = "settling"
+            if (steady || timeout) {
+                why = if (steady) "steady 0.5 s" else "1.5 s timeout"
+                c.onSeated(why)
+                appliedEpoch = c.placeEpoch
             }
         }
         if (!place) return
         val seat = Placement.seatFrame(pose)
         car = seat
-        lastProvisionalMs = now
         root.setLocal(position = seat.position, rotation = seat.rotation)
-        ScLog.i(String.format(Locale.US, "PLACE car=%s yaw=%.1f head=%s why=%s", ScLog.pos(seat.position), Angles.yawOfRotation(seat.rotation), ScLog.pos(pose.position), why))
+        if (why != "settling") ScLog.i(String.format(Locale.US, "PLACE car=%s yaw=%.1f head=%s why=%s", ScLog.pos(seat.position), Angles.yawOfRotation(seat.rotation), ScLog.pos(pose.position), why))
     }
 
     private fun readInput(hp: Pose?, carPose: Pose?, now: Long, dt: Double): FrameInput {
@@ -752,21 +687,14 @@ class CarScene(private val context: Context) {
             else null
         val ctrl = controllers.sample()
         val list = ArrayList<CtrlIn>()
-        var tracked = false
         if (ctrl != null) {
             for (s in listOf(ctrl.first, ctrl.second)) {
                 val pos = s.pose?.let { p -> carPose?.let { Placement.toCar(it, p.position) } }
-                if (s.pose != null) tracked = true
                 val aim = s.pose?.let { p -> carPose?.rotation?.conjugate()?.rotate(p.forward)?.normalized() }
-                list += CtrlIn(s.hand, pos, s.gripPressed, s.stickX, s.triggerPressed, aim)
-                if (s.hand == Hand.LEFT && abs(s.stickX - lastStick) > 0.2f) {
-                    lastStick = s.stickX
-                    if (!stickLogged || abs(s.stickX) > 0.7f) ScLog.i("N5 stick left x=${"%.2f".format(Locale.US, s.stickX)} (thumbstick injection works)")
-                    stickLogged = true
-                }
+                list += CtrlIn(s.hand, pos, s.triggerPressed, aim)
             }
         }
-        val pinches = if (carPose != null) hands.pinches().map { Triple(it.hand, Placement.toCar(carPose, it.position), it.value) } else emptyList()
+        controllerRayTaps(list)
         return FrameInput(
             nowMs = now,
             dt = dt,
@@ -776,112 +704,90 @@ class CarScene(private val context: Context) {
             gaze = gaze,
             eyeReason = eyes.unavailableReason(now),
             controllers = list,
-            controllersTracked = tracked,
-            pinches = pinches,
             aPresses = controllers.takeA(),
             bPresses = controllers.takeB(),
             yPresses = controllers.takeY(),
+            headPitchWorld = hp?.let { Angles.pitchOfRotation(it.rotation) },
         )
     }
 
-    private fun seat(): Seat = c.displayScenario().seat
-
-    private val doorShapes = HashMap<Seat, ShapeResource>()
-    private var physicsMat: PhysicsMaterialResource? = null
-
-    private fun physics(): PhysicsMaterialResource = physicsMat ?: shared.keep(PhysicsMaterialResource()).also { physicsMat = it }
-
-    /** The real door holder of [seat] (debug `tapdoor` replays a hit on its deepest mesh through the same listener). */
-    fun doorHolder(seat: Seat): Entity? = doorTaps[seat]
-
-    private fun updateCabin() {
-        val seat = seat()
-        for ((s, g) in cabinGroups) {
-            val want = s == seat
-            if (g.enabled != want) g.enabled = want
-        }
-        doorPivots[seat]?.let { (pivot, side) ->
-            val a = c.doorAngle()
-            pivot.setLocal(rotation = Layout.rotY(side.sign * a))
-        }
-        // the door is clickable (and lit by the system hover) only while a door question is checking (S05 / S06)
-        for ((s, holder) in doorTaps) {
-            val on = s == seat && c.doorTappable()
-            if (doorTapOn[s] == on) continue
-            doorTapOn[s] = on
-            val shape = doorShapes[s] ?: continue
-            if (on) {
-                holder.components.set(CollisionComponent(collisionShape = listOf(shape), physicsMaterial = physics()))
-                holder.components.set(InteractableComponent())
-                holder.components.set(HoverEffectComponent())
-            } else {
-                holder.components.remove(HoverEffectComponent::class.java)
-                holder.components.remove(InteractableComponent::class.java)
-                holder.components.remove(CollisionComponent::class.java)
+    /**
+     * Controller-ray fallback (D50, v0.1.1 door-input-rootcause.md): no factory headset log has yet shown the controller's
+     * trigger reaching a SpatialView as a `kind=POINTER` tap in Full Space, so a trigger press whose aim ray (controller
+     * −Z) crosses a tappable target's click box is a tap too. 800 ms dedupe with the system tap in [AppController.tap].
+     * No ray is drawn (D41: the system draws its own).
+     */
+    private fun controllerRayTaps(list: List<CtrlIn>) {
+        val side = c.progress.settings.traffic
+        val cabin = Cabin(Seat.DRIVER, side)
+        for (s in list) {
+            val was = triggerDown[s.hand] == true
+            triggerDown[s.hand] = s.trigger
+            if (!s.trigger || was) continue
+            val pos = s.pos ?: continue
+            val aim = s.aim ?: continue
+            val spots = HudLayout.hotspots(cabin, Layout.cabin(Seat.DRIVER, side)) + HudLayout.askHotspots(side)
+            var best: Pair<Target, Double>? = null
+            for (h in spots) {
+                if (!c.tappable(h.target)) continue
+                val d = DoorTargets.rayHit(pos, aim, hotspotBox(h)) ?: continue
+                if (best == null || d < best.second) best = h.target to d
             }
-            ScLog.i("DOOR tappable seat=$s on=$on")
+            val hit = best ?: continue
+            ScLog.i(String.format(Locale.US, "RAY hand=%s hit=%s dist=%.2f", s.hand, hit.first.id, hit.second))
+            c.tap(hit.first, "controller-ray")
         }
     }
 
-    private val lineupInst = HashMap<String, Entity>()
-    private val lineupMarks = ArrayList<Entity>()
+    /** Board-input hover (supplement to the system HoverEffect). */
+    fun hover(t: Target?) {
+        hud?.onHover(t, SystemClock.elapsedRealtime())
+    }
 
-    /**
-     * Debug `lineup front|side`: the five calibrated models parked on start markers (white crosses at each model's
-     * origin) in front of the car, for the ui-audit model views. Off = the normal actors again.
-     */
-    private fun updateLineup(): Boolean {
-        val mode = c.dbgLineup
-        val m = models
-        if (mode == null || m == null || cube == null) {
-            lineupInst.values.forEach { if (it.enabled) it.enabled = false }
-            lineupMarks.forEach { if (it.enabled) it.enabled = false }
-            return false
+    /** The real holder of a target (debug `tap` replays a hit on its deepest child through the board-input listener). */
+    fun targetEntity(t: Target): Entity? = if (t == Target.DOOR) doorHolder else hud?.holderOf(t)
+
+    private fun updateCabin() {
+        doorPivot?.let { (pivot, side) -> pivot.setLocal(rotation = Layout.rotY(side.sign * c.doorAngle())) }
+        val on = c.doorTappable()
+        val holder = doorHolder ?: return
+        val shape = doorShape ?: return
+        if (doorTapOn == on) return
+        doorTapOn = on
+        if (on) {
+            holder.components.set(CollisionComponent(collisionShape = listOf(shape), physicsMaterial = physics()))
+            holder.components.set(InteractableComponent())
+            holder.components.set(HoverEffectComponent())
+        } else {
+            holder.components.remove(HoverEffectComponent::class.java)
+            holder.components.remove(InteractableComponent::class.java)
+            holder.components.remove(CollisionComponent::class.java)
         }
-        val roles = listOf("sedan", "suv", "ebike", "bike", "moto")
-        val side = mode == "side"
-        val spacing = if (side) 5.2 else 2.7
-        val z = if (side) -15.0 else -11.0
-        if (lineupMarks.isEmpty()) {
-            for (i in roles.indices) {
-                lineupMarks += box(carRoot, "mark$i-a", Vec3.ZERO, Vec3(0.9, 0.01, 0.06), mat("line"))
-                lineupMarks += box(carRoot, "mark$i-b", Vec3.ZERO, Vec3(0.06, 0.01, 0.9), mat("line"))
-            }
-        }
-        for ((i, role) in roles.withIndex()) {
-            val x = (i - 2) * spacing
-            val p = Vec3(x, Road.ROAD_Y, z)
-            lineupMarks[2 * i].let { it.enabled = true; it.setLocal(position = p + Vec3(0.0, 0.006, 0.0)) }
-            lineupMarks[2 * i + 1].let { it.enabled = true; it.setLocal(position = p + Vec3(0.0, 0.006, 0.0)) }
-            var e = lineupInst[role]
-            if (e == null && m.loaded(role)) e = m.instance(role)?.also { carRoot?.addChild(it); lineupInst[role] = it }
-            e ?: continue
-            if (!e.enabled) e.enabled = true
-            // front view: the models face you (front = +Z, heading 180); side: front to your right (+90)
-            e.setLocal(position = p, rotation = Quat.yaw(if (side) 90.0 else 180.0))
-        }
-        actorInstances.values.forEach { if (it.enabled) it.enabled = false }
-        bus?.let { if (it.enabled) it.enabled = false }
-        return true
+        ScLog.i("DOOR tappable=$on")
+    }
+
+    /** The street slides back under your car: sideways move / pull-out offset plus the 36 km/h scroll (mod 36 m). */
+    private fun updateStreet(dt: Double) {
+        val mover = streetMover ?: return
+        scroll = (scroll + c.scrollSpeed() * dt) % 36.0
+        val (dx, dz) = c.egoOffset()
+        mover.setLocal(position = Vec3(-dx, 0.0, -dz + scroll))
     }
 
     private fun updateActors() {
-        if (updateLineup()) return
         val m = models
         val boxes = c.actorBoxes()
+        val (dx, dz) = c.egoOffset()
         val used = HashSet<String>()
-        var busUsed = false
         for ((a, box) in boxes) {
-            if (a.kind == ActorKind.BUS) {
-                bus?.let {
-                    if (!it.enabled) it.enabled = true
-                    it.setLocal(position = box.centre, rotation = Quat.yaw(box.headingDeg))
-                }
-                busUsed = true
-                continue
-            }
-            val role = a.kind.model ?: continue
+            val role = a.kind.model
             var e = actorInstances[a.id]
+            if (e != null && e.getName() != "actor:$role") {
+                e.enabled = false
+                instancePool.getOrPut(e.getName().removePrefix("actor:")) { ArrayList() } += e
+                actorInstances.remove(a.id)
+                e = null
+            }
             if (e == null && m != null && m.loaded(role)) {
                 val free = instancePool[role]?.removeLastOrNull()
                 e = free ?: m.instance(role)?.also { inst -> carRoot?.addChild(inst); ScLog.i("MODEL instance $role for ${a.id} opacityComponent=${inst.hasOpacityComponent()}") }
@@ -890,9 +796,8 @@ class CarScene(private val context: Context) {
             if (e == null) continue
             used += a.id
             if (!e.enabled) e.enabled = true
-            e.setLocal(position = box.centre, rotation = Quat.yaw(box.headingDeg))
+            e.setLocal(position = box.centre - Vec3(dx, 0.0, dz), rotation = Quat.yaw(box.headingDeg))
         }
-        if (!busUsed) bus?.let { if (it.enabled) it.enabled = false }
         val it = actorInstances.entries.iterator()
         while (it.hasNext()) {
             val (id, e) = it.next()
@@ -904,107 +809,8 @@ class CarScene(private val context: Context) {
         }
     }
 
-    private fun updateGhost(now: Long) {
-        val g = ghost ?: return
-        val pose = c.ghost()
-        if (pose == null) {
-            if (g.enabled) g.enabled = false
-            return
-        }
-        if (!g.enabled) g.enabled = true
-        val (gp, red) = pose
-        g.setLocal(position = gp.position, rotation = Quat.yaw(gp.headingDeg))
-        val flash = red && (now / 250) % 2 == 0L
-        val want = if (flash) ghostRed else ghostMat
-        for (p in ghostParts) want?.let { p.setMaterial(it) }
-    }
-
-    private fun updateGaze(now: Long) {
-        val dot = gazeDot ?: return
-        val ray = c.gazeDot()
-        if (ray == null) {
-            if (dot.enabled) dot.enabled = false
-            trail.forEach { if (it.enabled) it.enabled = false }
-            trailPts.clear()
-            return
-        }
-        val cabin = c.displayScenario().cabin
-        val p = Layout.gazePoint(cabin, ray.origin, ray.dir)
-        val eye = c.effHead?.pos ?: Vec3.ZERO
-        val k = 0.03 * (p - eye).length / 1.0
-        if (!dot.enabled) dot.enabled = true
-        dot.setLocal(position = p, rotation = Layout.facing(p, eye), scale = Vec3(k.coerceIn(0.03, 0.18), k.coerceIn(0.03, 0.18), 1.0))
-        trailPts.addLast(now to p)
-        while (trailPts.isNotEmpty() && now - trailPts.first().first > 600) trailPts.removeFirst()
-        for ((i, e) in trail.withIndex()) {
-            val target = now - (i + 1) * 100L
-            val pt = trailPts.lastOrNull { it.first <= target }?.second
-            if (pt == null) {
-                if (e.enabled) e.enabled = false
-                continue
-            }
-            if (!e.enabled) e.enabled = true
-            val kk = (k * (1.0 - (i + 1) * 0.13)).coerceIn(0.012, 0.15)
-            e.setLocal(position = pt, rotation = Layout.facing(pt, eye), scale = Vec3(kk, kk, 1.0))
-        }
-    }
-
-    private fun updateGuides(now: Long) {
-        val targets = c.guideTargets()
-        val eye = c.effHead?.pos ?: Vec3.ZERO
-        val pulse = 1.0 + 0.15 * sin(now / 1000.0 * 2 * Math.PI * 1.2)
-        for ((i, g) in guides.withIndex()) {
-            val t = targets.getOrNull(i)
-            if (t == null) {
-                if (g.enabled) g.enabled = false
-                continue
-            }
-            if (!g.enabled) g.enabled = true
-            val dist = (t - eye).length
-            val size = (0.10 * dist / 0.6).coerceIn(0.08, 1.4) * pulse
-            g.setLocal(position = t, rotation = Layout.facing(t, eye), scale = Vec3(size, size, 1.0))
-        }
-        val h = hand ?: return
-        val hp = c.demoHand()
-        if (hp == null) {
-            if (h.enabled) h.enabled = false
-        } else {
-            if (!h.enabled) h.enabled = true
-            h.setLocal(position = hp, rotation = Layout.rotY(if (c.displayScenario().cabin.doorSide == Dir.LEFT) 60.0 else -60.0))
-        }
-    }
-
-    private fun updateAlert(hp: Pose?, now: Long) {
-        val a = alert ?: return
-        val on = now < c.alertUntilMs && hp != null
-        if (!on) {
-            if (a.enabled) a.enabled = false
-            return
-        }
-        if (!a.enabled) a.enabled = true
-        a.setLocal(position = hp!!.position, rotation = hp.rotation)
-        // two pulses in 1.2 s
-        val u = ((now - c.alertStartMs) / 600.0) % 1.0
-        alertMat?.setOpacity((0.55 * sin(u * Math.PI)).toFloat().coerceIn(0f, 1f))
-    }
-
-    private fun updateArcs() {
-        val arcs = c.arcs().toMap()
-        val y = -0.14
-        for ((d, dots) in arcDots) {
-            val deg = arcs[d] ?: 0.0
-            for ((i, e) in dots.withIndex()) {
-                val a = deg * (i + 1) / dots.size
-                val on = deg > 2.0
-                if (!on) {
-                    if (e.enabled) e.enabled = false
-                    continue
-                }
-                if (!e.enabled) e.enabled = true
-                val dir = Angles.dir(d.sign * a)
-                e.setLocal(position = Vec3(dir.x * 0.42, y, dir.z * 0.42), scale = Vec3(0.008, 0.008, 0.008))
-            }
-        }
+    /** Replay: where your eyes / head pointed (design S15: 「你的目光 / 头朝向轨迹（小点）」), 1.2 m out. */
+    private fun updateTrail() {
         if (replayDots.isEmpty()) return
         val trailDirs = c.replayTrail()
         val step = maxOf(1, trailDirs.size / replayDots.size + 1)
@@ -1022,57 +828,12 @@ class CarScene(private val context: Context) {
         }
     }
 
-    private var testShown = false
+    // ---------------------------------------------------------------- panels (the three mirrors)
 
-    private fun updateTestTex() {
-        if (c.testTex == testShown) return
-        testShown = c.testTex
-        val road = c.displayScenario().road
-        roadMat?.setBaseColorTexture(if (testShown) testTexture ?: roadTexture(road) else roadTexture(road))
-        testTexture?.let { testMat?.setBaseColorTexture(it) }
-        testRoadCard?.let {
-            it.enabled = testShown
-            it.setLocal(position = Vec3(-1.25, Road.ROAD_Y + 0.01, -4.0), scale = Vec3(2.5, 1.0, 2.5))
-        }
-        testQuad?.let {
-            it.enabled = testShown
-            it.setLocal(position = Vec3(0.0, 0.25, -3.0), rotation = Layout.facing(Vec3(0.0, 0.25, -3.0), Vec3.ZERO), scale = Vec3(0.8, 0.8, 1.0))
-        }
-        ScLog.i("TESTTEX on=$testShown (road + upright card 3 m ahead)")
-    }
-
-    // ---------------------------------------------------------------- panels
-
-    private fun updatePanels(now: Long) {
+    private fun updatePanels() {
         val pool = pool ?: return
-        val s = c.state.value
-        val base = s.base
-        val seat = seat()
-        val side = c.progress.settings.traffic
-        val eye = c.effHead?.pos ?: Vec3.ZERO
-        val p1Visible = base in P1_STATES || (base == Base.S13)
-        val tall = s.page == P1Page.RESULT || s.page == P1Page.SCORECARD
-        val p1 = if (tall) Layout.p1Tall(seat, side) else Layout.p1(seat, side)
-        val p2 = Layout.p2(seat, side)
-        fun showFacing(id: String, place: io.embodit.shouldercheck.domain.PanelPlace) {
-            // yaw-only, upright (placeUpright): no pitch towards the eye
-            pool[id]?.place(place.centre, place.rotation, place.scale)
-        }
-        if (p1Visible && !tall) showFacing(PanelIds.P1, p1) else pool[PanelIds.P1]?.hide()
-        if (p1Visible && tall) showFacing(PanelIds.P1_TALL, p1) else pool[PanelIds.P1_TALL]?.hide()
-        val p2Visible = (base.practising || base == Base.S11) && !p1Visible
-        if (p2Visible) showFacing(PanelIds.P2, p2) else pool[PanelIds.P2]?.hide()
-        val angVisible = base == Base.S01B || base.practising
-        for ((id, d) in listOf(PanelIds.ANG_L to Dir.LEFT, PanelIds.ANG_R to Dir.RIGHT)) {
-            if (!angVisible) {
-                pool[id]?.hide()
-                continue
-            }
-            val pl = Layout.ang(seat, side, d)
-            pool[id]?.place(pl.centre, pl.rotation, pl.scale)
-        }
-        val cabin = Cabin(seat, side)
-        val mirrorsOn = seat == Seat.DRIVER && base != Base.S00
+        val cabin = Cabin(Seat.DRIVER, c.progress.settings.traffic)
+        val mirrorsOn = c.seated
         for (id in MirrorId.values()) {
             val slot = pool[PanelIds.mirrorPanel(id)] ?: continue
             val m = cabin.mirror(id)
@@ -1082,51 +843,31 @@ class CarScene(private val context: Context) {
             }
             slot.place(m.pos, Layout.facing(m.pos, Vec3.ZERO), PanelIds.MIRROR_SCALE)
         }
-        // D20: cabin parts inside the eye → P1 / P2 sight cone fade to 25 %
-        if (now - lastFadeMs > 200) {
-            lastFadeMs = now
-            val shownSlots = listOf(PanelIds.P1, PanelIds.P1_TALL, PanelIds.P2).mapNotNull { pool[it] }.filter { it.shown }
-            val parts = cabinParts[seat] ?: emptyList()
-            for ((e, part) in parts) {
-                if (part.mat == PartMat.HOOD) continue
-                val inCone = shownSlots.any { sl -> Layout.inSightCone(part, eye, sl.position, sl.rotation, sl.widthM, sl.heightM) }
-                if (inCone && e !in faded) {
-                    e.setFade(0.25f)
-                    faded += e
-                    ScLog.i("FADE ${part.name} 25% (D20)")
-                } else if (!inCone && e in faded) {
-                    e.setFade(1f)
-                    faded -= e
-                }
-            }
-        }
     }
 
-    // ---------------------------------------------------------------- mirrors
-
     private fun updateMirrors(now: Long) {
-        val seat = seat()
-        if (seat != Seat.DRIVER) return
         val interval = (1000.0 / c.mirrorHz).toLong()
         if (now - lastMirrorMs < interval) return
         lastMirrorMs = now
-        val sc = c.displayScenario()
-        val cabin = sc.cabin
+        val r = c.displayRound()
+        val cabin = r.cabin
         val eye = c.effHead?.pos ?: Vec3.ZERO
-        val aims = c.aims()
-        val boxes = c.actorBoxes()
-        val hl = c.mirrorHighlight()
+        val aims = MirrorAims()
+        val (dx, dz) = c.egoOffset()
+        val boxes = c.actorBoxes().map { (a, b) -> a to b.copy(centre = b.centre - Vec3(dx, 0.0, dz)) }
+        val hl = c.highlightId()
         val hood = argbColor(c.hoodColour)
+        val dash = ((scroll - dz) % 9.0 + 9.0) % 9.0
         for (m in cabin.mirrors) {
             if (panelShown[PanelIds.mirrorPanel(m.id)] != true) continue
-            MirrorStore.frames.getValue(m.id).value = MirrorFrames.build(m, cabin, sc.road, eye, aims.of(m.id), boxes, hl, hood)
+            MirrorStore.frames.getValue(m.id).value = MirrorFrames.build(m, cabin, r.road, eye, aims.of(m.id), boxes, hl, hood, dx, dash)
         }
         mirrorFrames++
         if (mirrorWindowMs == 0L) mirrorWindowMs = now
         if (now - mirrorWindowMs >= 5000) {
             val secs = (now - mirrorWindowMs) / 1000.0
             val avgFrameMs = if (frameCount > 0) frameTimeAcc / frameCount * 1000 else 0.0
-            ScLog.i(String.format(Locale.US, "N3 mirrors target=%.0fHz built=%.1f/s canvasDraws=%.1f/s frame=%.1fms", c.mirrorHz, mirrorFrames / secs, MirrorStore.draws / secs, avgFrameMs))
+            ScLog.i(String.format(Locale.US, "PERF mirrors target=%.0fHz built=%.1f/s canvasDraws=%.1f/s frame=%.1fms fps=%.1f", c.mirrorHz, mirrorFrames / secs, MirrorStore.draws / secs, avgFrameMs, frameCount / secs))
             mirrorFrames = 0
             MirrorStore.draws = 0
             mirrorWindowMs = now
@@ -1147,19 +888,16 @@ class CarScene(private val context: Context) {
         }
         if (t < due) return
         startupLogs++
-        ScLog.i("STARTUP ${due / 1000}s base=${c.state.value.base.code} head=${hp?.let { ScLog.pos(it.position) }} car=${car?.let { ScLog.pos(it.position) }} carYaw=${car?.let { "%.1f".format(Locale.US, Angles.yawOfRotation(it.rotation)) }} eye=${eyes.supportState()} ctrl=${controllers.status()} hands=${hands.supportState()}")
-        for (s in pool?.all ?: emptyList()) {
-            val w = s.enginePosition()
-            val rel = if (w != null && hp != null) {
-                val d = w - hp.position
-                String.format(Locale.US, "dist=%.2f yaw=%.1f pitch=%.1f off=%.1f", d.length, Angles.yawOf(d), Angles.pitchOf(d), Angles.between(d, hp.forward))
-            } else "dist=?"
-            ScLog.i("STARTUP ${due / 1000}s ${s.id} shown=${s.shown} visible=${panelShown[s.id] == true} rest=${s.rest} world=${ScLog.pos(w)} $rel")
+        ScLog.i("STARTUP ${due / 1000}s screen=${c.state.value.screen.code} head=${hp?.let { ScLog.pos(it.position) }} car=${car?.let { ScLog.pos(it.position) }} carYaw=${car?.let { "%.1f".format(Locale.US, Angles.yawOfRotation(it.rotation)) }} eye=${eyes.supportState()} ctrl=${controllers.status()}")
+        val g = hud?.holderOf(Target.GO)
+        val w = runCatching { g?.convertPositionTo(Vector3.ZERO, stageRoot)?.domain() }.getOrNull()
+        if (w != null && hp != null) {
+            val d = w - hp.position
+            ScLog.i(String.format(Locale.US, "STARTUP %ds btn:go world=%s dist=%.2f yaw=%.1f pitch=%.1f off=%.1f", due / 1000, ScLog.pos(w), d.length, Angles.yawOf(d), Angles.pitchOf(d), Angles.between(d, hp.forward)))
         }
-        ScLog.i("STARTUP ${due / 1000}s N4 eye supportState=${eyes.supportState()} reason=${eyes.unavailableReason(now)}")
     }
 
-    /** `sceneinfo instances`: every 3D entity with its model, world height, opacity component and blending (ui-audit e). */
+    /** `sceneinfo instances`: every 3D entity with its model, world height, opacity component and blending (ui-audit). */
     private fun instancesDump(): String {
         val root = stageRoot ?: return "no scene"
         val lines = ArrayList<String>()
@@ -1196,13 +934,9 @@ class CarScene(private val context: Context) {
                 lines += String.format(Locale.US, "INSTANCE glb model=%s.glb name=%s enabled=%s height=%.3f calibScale=%.4f opacityComponent=%s blending=%s", role, name, e.enabled, height(e), scale, opacityUp(e), blend(e))
                 return
             }
-            if (e.components[com.pico.spatial.core.ecs.ModelComponent::class.java] != null) {
-                lines += String.format(Locale.US, "INSTANCE mesh name=%s enabled=%s height=%.3f opacityComponent=%s blending=%s", name, e.enabled, height(e), opacityUp(e), blend(e))
-            }
             runCatching { e.getChildren() }.getOrNull()?.forEach { visit(it) }
         }
         visit(root)
-        for (pool in instancePool.values) for (e in pool) if (e.getParent() == null) visit(e)
         lines.forEach { ScLog.i(it) }
         return "instances=${lines.size} (see INSTANCE lines)"
     }
@@ -1215,7 +949,7 @@ class CarScene(private val context: Context) {
                 val hp = head.pose()
                 "head=${hp?.let { ScLog.pos(it.position) + " " + ScLog.quat(it.rotation) }} car=${car?.let { ScLog.pos(it.position) + " yaw=" + Angles.yawOfRotation(it.rotation) }} inCar=${c.effHead}"
             }
-            else -> "frames=$frame street=$streetKey cabin=${cabinSide} seat=${seat()} actors=${actorInstances.keys} faded=${faded.size} work=${heavy.size}+${light.size} models=${listOf("sedan", "suv", "ebike", "bike", "moto").map { it to (models?.loaded(it) == true) }}"
+            else -> "frames=$frame street=$streetKey cabin=$cabinSide actors=${actorInstances.keys} trees=${trees.size} work=${heavy.size}+${light.size} scroll=${"%.1f".format(Locale.US, scroll)} models=${listOf("sedan", "suv", "ebike", "bike", "moto", "tree").map { it to (models?.loaded(it) == true) }}"
         }
 
     companion object {
@@ -1223,8 +957,10 @@ class CarScene(private val context: Context) {
         private const val SLOW_GAP_MS = 1200L
         private const val SKY_D = 900.0
         private const val ROAD_HALF = 162.0
+        private const val TREE_RANGE = 72.0
         private const val SUN_LUX = 2600f
         private const val FILL_LUX = 700f
-        private val P1_STATES = setOf(Base.S00, Base.S01, Base.S01B, Base.S02, Base.S03, Base.S10, Base.S12, Base.S14, Base.S15, Base.S16, Base.S19)
+        private const val LAMP_LUX = 2500f
+        private const val DUSK_DIM = 0.5f
     }
 }

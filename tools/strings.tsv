@@ -1,0 +1,150 @@
+lang_code	en	zh
+app_name	Shoulder Check	盲区回头
+app_title	Shoulder Check	盲区回头
+tagline	Mirror, shoulder, then go.	看镜子，回头，没车再走。
+first_hint	Check the mirror, look over your shoulder, then tap the green button	先看镜子，再回头，没车就点绿色按钮
+loading	Getting in the car…	正在上车…
+scn_lc_l	Move to the left lane ←	变道到左边 ←
+scn_lc_r	Move to the right lane →	变道到右边 →
+scn_po	Pull out from the curb ←	从路边开出去 ←
+scn_po_r	Pull out from the curb →	从路边开出去 →
+scn_mg	Merge onto the road ←	并进主路 ←
+scn_mg_r	Merge onto the road →	并进主路 →
+scn_dr	Getting out: look before you open	下车，开门前看一眼
+go_lc_l	Go ←	变道 ←
+go_lc_r	Go →	变道 →
+go_po	Pull out ←	起步 ←
+go_po_r	Pull out →	起步 →
+go_mg	Merge ←	并线 ←
+go_mg_r	Merge →	并线 →
+go_dr	Open	开门
+go_continue	Continue	继续
+go_skip	Skip	跳过
+chip_mirror	Mirror	镜
+chip_shoulder	Shoulder	回头
+out_safe	Clear	安全
+out_waited	Good wait	等对了
+out_lucky	Lucky	侥幸
+out_miss	Close call	险情
+out_timeout	Too late	超时
+line_lucky	Nobody there this time. Next time there might be.	这次旁边没车，下次可能有。
+line_miss_trap_left	It was in your left blind spot. The mirror can\'t show it.	它在你左后方的盲区里，镜子里看不到。
+line_miss_trap_right	It was in your right blind spot. The mirror can\'t show it.	它在你右后方的盲区里，镜子里看不到。
+line_miss_seen	It was right there in the mirror. Just wait a beat.	镜子里就有它，再等一下就好。
+line_miss_door	A bike was coming up beside you. Look back before the door.	身后有车骑过来，开门前回头看。
+line_timeout	There was a gap. Go when you\'ve checked.	刚才有空档，看清了就走。
+line_waited	Nice patience.	沉得住气。
+line_door	Use your far hand. Your body turns on its own.	开门用远侧手，身体自然会转过去。
+line_signal	Signal on before the move.	动之前先打灯。
+line_eye_off	Eye tracking is off: mirror checks use head direction	眼动没开：看镜子按头的方向算
+eye_ask	Turn on eye tracking? Then we can tell which mirror you looked at.	开眼动？这样能认出你看了哪面镜子。
+eye_on	Turn on	开启
+eye_no	No thanks	不用
+look_forward	Eyes front first	先看回前面
+res_reason_ok	Shoulder ✓ Mirror ✓ %1$s s	回头了 ✓ 镜子 ✓ %1$s s
+res_no_shoulder	No shoulder check	没回头
+res_no_mirror	No mirror check	没看镜子
+res_no_both	No mirror, no shoulder	没看镜子，也没回头
+res_points	+%1$d	+%1$d
+res_combo	Combo ×%1$d	连击 ×%1$d
+res_score	%1$s pts	%1$s 分
+hud_combo_score	Combo ×%1$d · %2$s	连击 ×%1$d · %2$s
+hud_round	Round %1$d/8	第 %1$d/8 轮
+replay_here	It\'s here	它在这
+replay_count	%1$d/%2$d	%1$d/%2$d
+merge_left	%1$d m left	还剩 %1$d m
+summary_3d	%1$s pts %2$s	本局 %1$s 分 %2$s
+menu	Menu	菜单
+pause	Pause	暂停
+tab_practice	Practice	练习
+tab_records	Records	成绩
+tab_settings	Settings	设置
+level_label	Level %1$d	第 %1$d 关
+level_1	Day · light	白天 · 车少
+level_2	Day · busy	白天 · 车多
+level_3	Expressway	快速路
+level_4	Dusk	傍晚
+level_locked	2 stars on the level before unlocks it	上一关拿到 2 星解锁
+level_prev	Previous level	上一关
+level_next	Next level	下一关
+start	Start	开始
+daily	Today\'s run	今日挑战
+daily_best	Today\'s best %1$s	今日最好 %1$s
+daily_none	Today\'s set, 8 rounds	今天这一套，8 轮
+best_line	Best %1$s · %2$s	最好 %1$s · %2$s
+best_none	Not played yet	还没玩过
+next_step	Next: tap Start, check the mirror, look back, go when it\'s clear.	接下来：点开始，看镜子、回头，没车就走。
+result_title	Game over	这局结束
+result_again	Play again	再来一局
+result_replay	Watch the %1$d misses	看漏看的 %1$d 次
+result_next	Next level	下一关
+result_best	Best %1$s	最好 %1$s
+result_record	New best!	新纪录！
+result_stats_clear	Clear %1$d/8	安全 %1$d/8
+result_stats_check	Avg check %1$s s	平均回头 %1$s s
+result_stats_missed	Missed most: %1$s	最常漏看：%1$s
+result_unlocked	Next level unlocked	下一关解锁了
+side_left_back	left rear	左后
+side_right_back	right rear	右后
+side_none	none	没有
+records_title	Records	成绩
+records_plays	%1$d games	%1$d 局
+records_daily	Today\'s run · today\'s best %1$s	今日挑战 · 今日最好 %1$s
+records_streak	%1$d days in a row	连续 %1$d 天
+settings	Settings	设置
+set_practice	Practice	练习
+set_system	System	系统
+comfort	Comfort mode	舒适模式
+comfort_desc	Your car stays still	自车不动
+traffic	Traffic side	行车方向
+traffic_right	Right	靠右
+traffic_left	Left	靠左
+eye	Eye tracking	眼动
+eye_state_on	On	已开
+eye_enable	Turn on	去开启
+how_to	How to play	怎么操作
+volume	Volume	主音量
+vol_low	Low	低
+vol_mid	Mid	中
+vol_high	High	高
+mute	Mute	静音
+unmute	Sound on	开声音
+language	Language	语言
+lang_zh	中文	中文
+lang_en	English	English
+recentre	Recentre	回正
+clear_scores	Clear scores	清除成绩
+about	About	关于
+about_text	Shoulder Check 0.2.0 · offline, no account. Traffic rules: check the mirror and look over your shoulder before you change lanes, merge, pull out or open the door.	盲区回头 0.2.0 · 全离线、无账号。交规要求：变道、并线、起步、开车门前，先看后视镜，再回头看盲区。
+quit_app	Quit app	退出应用
+quit_ask	Quit Shoulder Check?	退出盲区回头？
+cancel	Cancel	取消
+quit	Quit	退出
+clear_ask	Clear all scores? This can\'t be undone.	清除所有成绩？不能恢复。
+clear	Clear	清除
+back	Back	返回
+how_to_title	How to play	怎么操作
+how_to_check_title	Check the mirror, look back	看镜子 / 回头
+how_to_check_hand	Hands: just turn your head; your eyes are tracked	手势：转头就行，眼睛会被识别
+how_to_check_ctrl	Controller: the same, just turn your head	手柄：一样，转头就行
+how_to_go_title	Go	走
+how_to_go_hand	Hands: look at the green button and pinch, or point the hand ray and pinch	手势：看着绿色按钮捏一下，或用手势射线指着捏
+how_to_go_ctrl	Controller: point and pull the trigger, or press A	手柄：射线指着按扳机，或直接按 A 键
+how_to_door_title	Open the door	开门
+how_to_door_hand	Hands: pinch the inner door handle (or reach and touch it)	手势：看着车门内把手捏一下（也可以伸手碰它）
+how_to_door_ctrl	Controller: point at the handle and pull the trigger, or press A	手柄：射线指着把手按扳机，或按 A 键
+how_to_pause_title	Pause	暂停
+how_to_pause_hand	Hands: pinch 「Pause」 above the steering wheel	手势：看着方向盘上方的「暂停」捏一下
+how_to_pause_ctrl	Controller: press Y or B	手柄：按 Y 键或 B 键
+pause_title	Paused	暂停了
+resume	Continue	继续
+restart_game	Restart game	重来这局
+back_to_practice	Back to practice	回到练习页
+restart_ask	Restart this game? Its score is not kept.	重来这局？这局的分数不保留。
+leave_ask	Back to practice? This game\'s score is not kept.	回到练习页？这局的分数不保留。
+daily_pause_note	Today\'s run: this round counts as played.	今日挑战：这一轮算已玩。
+lost	Tracking lost. Look around the room, then continue.	头显跟丢了，看一圈房间再继续。
+unavailable	Full Space is needed to look behind you.	需要全空间才能回头看后面。
+level_up	Level %1$d unlocked	第 %1$d 关解锁了
+window_front	Bring the window back to front	窗口回到面前
+to_practice	Practice page	练习页
