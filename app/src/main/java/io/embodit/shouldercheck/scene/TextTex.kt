@@ -94,8 +94,11 @@ internal class TexLabel(
     /** Redraws when [k] differs from the last key. */
     fun set(res: Resources, k: String, frame: Long, draw: (Canvas, Resources, Int, Int) -> Unit) {
         retire(frame)
-        if (k == key) return
-        key = k
+        // v0.2.2 (QA: the result card stayed in the old language after 换语言): the cache key carries the locale, so
+        // every texture whose key has no localised text in it (the result pop, Hud3D) redraws when the language changes
+        val full = cacheKey(res.configuration.locales[0]?.toLanguageTag() ?: "", k)
+        if (full == key) return
+        key = full
         val bmp = Bitmap.createBitmap(wPx, hPx, Bitmap.Config.ARGB_8888)
         draw(Canvas(bmp), res, wPx, hPx)
         val tex = runCatching { TextureResource.create(bmp).also { it.toGlobal() } }.onFailure { ScLog.e("HUD texture failed: $it") }.getOrNull() ?: return
@@ -122,5 +125,10 @@ internal class TexLabel(
         retiring.clear()
         current = null
         key = null
+    }
+
+    companion object {
+        /** Texture cache key: locale + caller key (pure, unit-tested). */
+        fun cacheKey(localeTag: String, k: String): String = "$localeTag|$k"
     }
 }

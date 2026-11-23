@@ -1,5 +1,6 @@
 package io.embodit.shouldercheck.app
 
+import io.embodit.shouldercheck.BuildConfig
 import android.content.Context
 import io.embodit.shouldercheck.domain.Actor
 import io.embodit.shouldercheck.domain.ActorKind
@@ -226,7 +227,7 @@ object AppController {
         idleRound = idle(progress.settings.traffic)
         val granted = EyePermissionActivity.granted(app)
         update { it.copy(progress = progress, language = progress.settings.language, traffic = progress.settings.traffic, muted = progress.settings.muted, practiceLevel = lastLevel(), eyeGranted = granted, firstVisit = progress.gamesPlayed == 0) }
-        ScLog.i("APP start v0.2.0 games=${progress.gamesPlayed} unlocked=${progress.unlocked} traffic=${progress.settings.traffic} comfort=${progress.settings.comfort} lang=${progress.settings.language} eyeGranted=$granted T=${progress.thresholds}")
+        ScLog.i("APP start v${BuildConfig.VERSION_NAME} games=${progress.gamesPlayed} unlocked=${progress.unlocked} traffic=${progress.settings.traffic} comfort=${progress.settings.comfort} lang=${progress.settings.language} eyeGranted=$granted T=${progress.thresholds}")
         EyePermissionActivity.onResult = { ok ->
             ScLog.i("EYE permission result=$ok")
             update { it.copy(eyeGranted = ok) }
@@ -859,7 +860,10 @@ object AppController {
                 kotlin.math.sin(Math.toRadians(rel)).toFloat()
             }
         val au = audio ?: return
-        if (a?.kind?.rider == true) au.cue(Audio.BELL, pan) else au.cue(Audio.ALERT, pan)
+        // the car stops hard (stopTau) on every miss: tyre skid from the car itself; the other road user warns with
+        // its horn (car) or bell (rider), panned to where it is
+        au.cue(Audio.SKID, 0f, SKID_LEVEL)
+        if (a?.kind?.rider == true) au.cue(Audio.BELL, pan) else au.cue(Audio.HORN, pan)
         ScLog.i("NEARMISS sound actor=${a?.id} kind=${a?.kind} pan=${"%.2f".format(Locale.US, pan)}")
     }
 
@@ -1187,6 +1191,7 @@ object AppController {
     }
 
     const val HORN_DELAY = 0.25
+    const val SKID_LEVEL = 0.8f
     const val FREEZE = 0.3
     const val POP_CLEAR_MS = 1200L
     const val POP_OTHER_MS = 1500L

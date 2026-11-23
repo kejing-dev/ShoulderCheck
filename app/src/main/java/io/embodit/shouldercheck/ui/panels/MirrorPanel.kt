@@ -12,7 +12,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
@@ -32,6 +34,7 @@ import io.embodit.shouldercheck.domain.MirrorId
 import io.embodit.shouldercheck.platform.ScLog
 import io.embodit.shouldercheck.scene.MPoly
 import io.embodit.shouldercheck.scene.MirrorFrame
+import io.embodit.shouldercheck.scene.MirrorFrames
 import io.embodit.shouldercheck.scene.MirrorStore
 import io.embodit.shouldercheck.ui.theme.ScColors
 
@@ -80,8 +83,11 @@ fun MirrorPanel(id: MirrorId, widthDp: Int, heightDp: Int) {
         val w = size.width
         val h = size.height
         val horizonY = ((1f - (f?.horizonV ?: 0.55f)) * h).coerceIn(-h, 2 * h)
-        drawRect(Brush.verticalGradient(listOf(ScColors.SkyHigh, ScColors.SkyLow), startY = 0f, endY = horizonY.coerceAtLeast(1f)), size = Size(w, horizonY.coerceIn(0f, h)))
-        if (horizonY < h) drawRect(ScColors.Sidewalk.copy(alpha = 1f), topLeft = Offset(0f, horizonY.coerceAtLeast(0f)), size = Size(w, h - horizonY.coerceAtLeast(0f)))
+        val dusk = f?.dusk == true
+        val (skyTop, skyLow) = MirrorFrames.sky(dusk)
+        val tint = MirrorFrames.spriteTint(dusk)?.let { ColorFilter.tint(it, BlendMode.Modulate) }
+        drawRect(Brush.verticalGradient(listOf(skyTop, skyLow), startY = 0f, endY = horizonY.coerceAtLeast(1f)), size = Size(w, horizonY.coerceIn(0f, h)))
+        if (horizonY < h) drawRect(MirrorFrames.ground(dusk), topLeft = Offset(0f, horizonY.coerceAtLeast(0f)), size = Size(w, h - horizonY.coerceAtLeast(0f)))
         if (f == null) return@Canvas
         for (p in f.polys) poly(p, w, h)
         for (s in f.sprites) {
@@ -96,7 +102,7 @@ fun MirrorPanel(id: MirrorId, widthDp: Int, heightDp: Int) {
             val left = gx - (sil.image.width - sil.groundX) * pxPerCanvas
             val top = gy - sil.groundY * pxPerCanvas
             withTransform({ scale(-1f, 1f, Offset(left + iw / 2, top + ih / 2)) }) {
-                drawImage(sil.image, IntOffset.Zero, IntSize(sil.image.width, sil.image.height), IntOffset(left.toInt(), top.toInt()), IntSize(iw.toInt().coerceAtLeast(1), ih.toInt().coerceAtLeast(1)))
+                drawImage(sil.image, IntOffset.Zero, IntSize(sil.image.width, sil.image.height), IntOffset(left.toInt(), top.toInt()), IntSize(iw.toInt().coerceAtLeast(1), ih.toInt().coerceAtLeast(1)), colorFilter = tint)
             }
             if (s.highlight) {
                 drawRoundRect(ScColors.Miss, Offset(left - 4f, top - 4f), Size(iw + 8f, ih + 8f), CornerRadius(8f, 8f), style = Stroke(width = 5f))

@@ -860,7 +860,7 @@ class CarScene(private val context: Context) {
         val dash = ((scroll - dz) % 9.0 + 9.0) % 9.0
         for (m in cabin.mirrors) {
             if (panelShown[PanelIds.mirrorPanel(m.id)] != true) continue
-            MirrorStore.frames.getValue(m.id).value = MirrorFrames.build(m, cabin, r.road, eye, aims.of(m.id), boxes, hl, hood, dx, dash)
+            MirrorStore.frames.getValue(m.id).value = MirrorFrames.build(m, cabin, r.road, eye, aims.of(m.id), boxes, hl, hood, dx, dash, c.dusk())
         }
         mirrorFrames++
         if (mirrorWindowMs == 0L) mirrorWindowMs = now

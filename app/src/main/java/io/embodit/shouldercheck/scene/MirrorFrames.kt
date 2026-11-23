@@ -33,6 +33,8 @@ class MirrorFrame(
     /** Inner mirror: the rear window outline; everything outside it is the car's interior. */
     val window: FloatArray?,
     val seq: Int,
+    /** Level 4 dusk (v0.2.2 showcase finding: the mirrors still showed day): dusk sky, dimmed surfaces and cars. */
+    val dusk: Boolean = false,
 )
 
 /** Compose-side holder of the latest frame per mirror and the N3 counters (Canvas draws per second). */
@@ -63,6 +65,7 @@ internal object MirrorFrames {
         /** Your car's sideways move (the road shifts by −dx in the car frame) and the dash scroll (0 … 9 m). */
         dx: Double = 0.0,
         dashShift: Double = 0.0,
+        dusk: Boolean = false,
     ): MirrorFrame {
         fun p(x: Double, y: Double, z: Double): Pair<Float, Float>? {
             val h = MirrorModel.projectRaw(Vec3(x - dx, y, z), mirror, eye, aim) ?: return null
@@ -170,6 +173,19 @@ internal object MirrorFrames {
                 val uv = corners.mapNotNull { MirrorModel.projectRaw(it, mirror, eye, aim) }
                 if (uv.size == 4) uv.flatMap { listOf(it.u.toFloat(), it.v.toFloat()) }.toFloatArray() else null
             } else null
-        return MirrorFrame(mirror.id, horizon, polys, sprites, front, window, ++seq)
+        val lit = { list: List<MPoly> -> if (dusk) list.map { MPoly(it.color.shade(DUSK_DIM), it.pts) } else list }
+        return MirrorFrame(mirror.id, horizon, lit(polys), sprites, lit(front), window, ++seq, dusk)
     }
+
+    /** Same dimming as the street's unlit surfaces at dusk (CarScene DUSK_DIM). */
+    const val DUSK_DIM = 0.5f
+
+    /** Mirror sky colours (top, horizon) for the level's lighting. */
+    fun sky(dusk: Boolean): Pair<Color, Color> = if (dusk) ScColors.DuskHigh to ScColors.DuskLow else ScColors.SkyHigh to ScColors.SkyLow
+
+    /** Ground below the horizon. */
+    fun ground(dusk: Boolean): Color = if (dusk) ScColors.Sidewalk.copy(alpha = 1f).shade(DUSK_DIM) else ScColors.Sidewalk.copy(alpha = 1f)
+
+    /** Multiplier for the car silhouettes (null = as drawn). */
+    fun spriteTint(dusk: Boolean): Color? = if (dusk) Color(0.55f, 0.5f, 0.47f, 1f) else null
 }

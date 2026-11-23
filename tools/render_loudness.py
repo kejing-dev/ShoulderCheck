@@ -1,7 +1,7 @@
 """Loudness evidence (factory gate `loudness`, B20 / build.md 「只有短促反馈音的应用」): renders, at the app's DEFAULT
 gain (中 = 0.9, Audio.kt levels), the event sounds of two typical rounds back to back — turn-signal relay ticks (level
-0.35), the 「嗒」 of the mirror and shoulder checks, the clear 「叮」 rising with the combo, the door latch, the bicycle
-bell / near-miss alert of a close call, too late, new best — and writes it. Rendered, not recorded (the emulator has no
+0.35), the 「嗒」 of the mirror and shoulder checks, the clear 「叮」 rising with the combo, the door latch, the car horn
++ tyre skid / bicycle bell + skid of a close call (v0.2.2 CC0 recordings), too late, new best — and writes it. Rendered, not recorded (the emulator has no
 audio loopback); RMS is measured on the voiced 20 ms windows only, like the gate.
 
     python -X utf8 tools/render_loudness.py <out.wav>
@@ -44,9 +44,12 @@ def main(out):
             put(t0 + k * 0.667, ind, 0.35)
         put(t0 + 1.6, tick)
         put(t0 + 2.6, tick)
-        if rnd == 3:
-            put(t0 + 3.4, load("near_miss"))
-            put(t0 + 3.5, load("bike_bell"))
+        if rnd == 1:
+            put(t0 + 3.4, load("skid"), 0.8)
+            put(t0 + 3.4, load("horn"))
+        elif rnd == 3:
+            put(t0 + 3.4, load("skid_1"), 0.8)
+            put(t0 + 3.4, load("bike_bell"))
         elif rnd == 4:
             put(t0 + 3.4, load("timeout"))
         else:
